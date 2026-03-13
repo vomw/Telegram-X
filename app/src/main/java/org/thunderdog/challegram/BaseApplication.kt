@@ -16,12 +16,11 @@ package org.thunderdog.challegram
 
 import android.content.Context
 import androidx.multidex.MultiDexApplication
-import androidx.work.Configuration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import org.thunderdog.challegram.tool.UI
 
-class BaseApplication : MultiDexApplication(), Configuration.Provider {
+class BaseApplication : MultiDexApplication() {
   companion object {
     lateinit var scope: CoroutineScope
   }
@@ -32,7 +31,4 @@ class BaseApplication : MultiDexApplication(), Configuration.Provider {
 
     UI.initApp(applicationContext)
   }
-
-  override val workManagerConfiguration: Configuration
-    get() = Configuration.Builder().build()
 }
