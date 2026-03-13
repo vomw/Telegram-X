@@ -263,7 +263,7 @@ android {
         )
         externalNativeBuild.cmake {
           arguments(
-            "-DANDROID_PLATFORM=android-${selectedMinSdk}",
+            "-DANDROID_PLATFORM=android-${actualMinSdk}",
             "-DTGX_FLAVOR=${variant.flavor}",
             "-DANDROID_STL=${if (Config.SHARED_STL) "c++_shared" else "c++_static"}",
             "-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON",
