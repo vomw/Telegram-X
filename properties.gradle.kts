@@ -38,10 +38,3 @@ fun resolveGradleProperty(name: String): String? {
     }
   }
 }
-
-val extension = resolveGradleProperty("tgx.extension") ?: "none"
-if (extension != "none" && extension != "hms") {
-  error("Unknown extension: ${extension}")
-}
-extra["huawei"] = (extension == "hms")
-extra["extension"] = extension

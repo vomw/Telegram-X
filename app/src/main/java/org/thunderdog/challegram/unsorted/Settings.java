@@ -423,7 +423,6 @@ public class Settings {
   public static final long SETTING_FLAG_NO_EMBEDS = 1 << 13;
   public static final long SETTING_FLAG_LIMIT_STICKERS_FPS = 1 << 14;
   public static final long SETTING_FLAG_EXPAND_RECENT_STICKERS = 1 << 15;
-  public static final long SETTING_FLAG_FOREGROUND_SERVICE_ENABLED = 1 << 16;
   public static final long SETTING_FLAG_DYNAMIC_ORDER_STICKER_PACKS = 1 << 17;
   public static final long SETTING_FLAG_DYNAMIC_ORDER_EMOJI_PACKS = 1 << 18;
   public static final long SETTING_FLAG_FORCE_DEFAULT_ANIMATION_FOR_RIGHT_SWIPE_EDGE = 1 << 19;
@@ -805,7 +804,6 @@ public class Settings {
   public static final int MAP_PROVIDER_UNSET = -1;
   public static final int MAP_PROVIDER_NONE = 0;
   public static final int MAP_PROVIDER_TELEGRAM = 1;
-  public static final int MAP_PROVIDER_GOOGLE = 2;
 
   public static final int MAP_PROVIDER_DEFAULT_CLOUD = MAP_PROVIDER_TELEGRAM;
 
@@ -889,8 +887,6 @@ public class Settings {
     if (Config.TEST_NEW_FEATURES_PROMPTS) {
       forceRevokeAllFeaturePrompts();
     }
-    trackInstalledApkVersion();
-    trackChangesInAvailableFeatures();
     Log.i("Opened database in %dms", SystemClock.uptimeMillis() - ms);
     checkPendingPasscodeLocks();
     applyLogSettings(true);
@@ -1741,22 +1737,6 @@ public class Settings {
         break;
       }
       case VERSION_16: {
-        // Removing cloud map provider setting, if it's equal to Google
-        try {
-          int type = pmc.tryGetInt(KEY_MAP_PROVIDER_TYPE_CLOUD);
-          if (type == MAP_PROVIDER_GOOGLE) {
-            editor.remove(KEY_MAP_PROVIDER_TYPE_CLOUD);
-          }
-        } catch (FileNotFoundException ignored) {
-        }
-        // Removing secret chat map provider setting, if it's equal to Google
-        try {
-          int type = pmc.tryGetInt(KEY_MAP_PROVIDER_TYPE);
-          if (type == MAP_PROVIDER_GOOGLE) {
-            editor.remove(KEY_MAP_PROVIDER_TYPE);
-          }
-        } catch (FileNotFoundException ignored) {
-        }
         break;
       }
       case VERSION_17: {
@@ -4832,19 +4812,6 @@ public class Settings {
   }
 
   public void trackSuccessfulConnection (int proxyId, long timestampMs, long resultMs, boolean isPing) {
-    if (proxyId <= Settings.PROXY_ID_UNKNOWN)
-      throw new IllegalArgumentException(Integer.toString(proxyId));
-    if (isPing) {
-      pmc.putLongArray(KEY_PROXY_PREFIX_LAST_PING + proxyId, new long[] {timestampMs, resultMs});
-    } else {
-      int connectedCount =
-        pmc.getInt(KEY_PROXY_PREFIX_CONNECTED_COUNT + proxyId, 0)
-          + 1;
-      pmc.edit()
-        .putLongArray(KEY_PROXY_PREFIX_LAST_CONNECTION + proxyId, new long[] {timestampMs, resultMs})
-        .putInt(KEY_PROXY_PREFIX_CONNECTED_COUNT + proxyId, connectedCount)
-        .apply();
-    }
   }
 
   public int addOrUpdateProxy (@NonNull TdApi.InternalLinkTypeProxy proxy, @Nullable String proxyDescription, boolean setAsCurrent) {
@@ -6281,12 +6248,23 @@ public class Settings {
     toggleUtilityFeature(UTILITY_FEATURE_ENCRYPTED_PUSHES, enabled);
   }*/
 
-  public boolean isEmulator () {
-    return pmc.getBoolean(KEY_IS_EMULATOR, false);
+  public static boolean isEmulator () {
+    return false;
+  }
+
+  public static boolean isEmulatorDetected () {
+    return false;
+  }
+
+  public static boolean checkIsEmulator (android.content.Context context) {
+    return false;
   }
 
   public static class EmulatorDetectionResult {
-    public final long time, installationId, elapsed, result;
+    public final long time;
+    public final long installationId;
+    public final long elapsed;
+    public final long result;
 
     public EmulatorDetectionResult (long time, long installationId, long elapsed, long result) {
       this.time = time;
@@ -6296,21 +6274,11 @@ public class Settings {
     }
 
     public boolean isEmulatorDetected () {
-      return result != 0;
+      return false;
     }
 
-    @SuppressWarnings("all")
     public boolean mayBeFalsePositive () {
-      int testId = BitwiseUtils.splitLongToSecondInt(result);
-      switch (BuildConfig.FLAVOR) {
-        case "x86":
-        case "x64":
-          return false;
-        case "arm64":
-        case "arm32":
-        default:
-          return testId == 2;
-      }
+      return false;
     }
 
     public String toHumanReadableFormat () {
@@ -6358,14 +6326,6 @@ public class Settings {
     );
     long[] data = result.toLongArray();
     pmc.putLongArray(KEY_EMULATOR_DETECTION_RESULT, data);
-    boolean wasEmulator = isEmulator();
-    if (wasEmulator != result.isEmulatorDetected()) {
-      if (result.isEmulatorDetected()) {
-        putBoolean(KEY_IS_EMULATOR, true);
-      } else {
-        pmc.remove(KEY_IS_EMULATOR);
-      }
-    }
     return result;
   }
 
@@ -6550,12 +6510,6 @@ public class Settings {
     @DeviceTokenType int tokenType = TdlibNotificationUtils.getDeviceTokenType(deviceToken);
     final String tokenOrEndpoint;
     switch (tokenType) {
-      case DeviceTokenType.FIREBASE_CLOUD_MESSAGING:
-        tokenOrEndpoint = ((TdApi.DeviceTokenFirebaseCloudMessaging) deviceToken).token;
-        break;
-      case DeviceTokenType.HUAWEI_PUSH_SERVICE:
-        tokenOrEndpoint = ((TdApi.DeviceTokenHuaweiPush) deviceToken).token;
-        break;
       case DeviceTokenType.SIMPLE_PUSH_SERVICE:
         tokenOrEndpoint = ((TdApi.DeviceTokenSimplePush) deviceToken).endpoint;
         break;
@@ -6590,19 +6544,15 @@ public class Settings {
       return null;
     }
     switch (tokenType) {
-      case DeviceTokenType.FIREBASE_CLOUD_MESSAGING:
-        return new TdApi.DeviceTokenFirebaseCloudMessaging(tokenOrEndpoint, true);
       case DeviceTokenType.SIMPLE_PUSH_SERVICE:
         return new TdApi.DeviceTokenSimplePush(tokenOrEndpoint);
-      case DeviceTokenType.HUAWEI_PUSH_SERVICE:
-        return new TdApi.DeviceTokenHuaweiPush(tokenOrEndpoint, true);
     }
     return null;
   }
 
   @Nullable
   public TdApi.DeviceToken getDeviceToken () {
-    @DeviceTokenType int tokenType = pmc.getInt(KEY_PUSH_DEVICE_TOKEN_TYPE, DeviceTokenType.FIREBASE_CLOUD_MESSAGING);
+    @DeviceTokenType int tokenType = pmc.getInt(KEY_PUSH_DEVICE_TOKEN_TYPE, DeviceTokenType.SIMPLE_PUSH_SERVICE);
     String tokenOrEndpoint = pmc.getString(KEY_PUSH_DEVICE_TOKEN_OR_ENDPOINT, null);
     return newDeviceToken(tokenType, tokenOrEndpoint);
   }
@@ -7007,66 +6957,9 @@ public class Settings {
   }
 
   private void trackInstalledApkVersion () {
-    final long knownCommitDate = pmc.getLong(KEY_APP_COMMIT_DATE, 0);
-    if (AppBuildInfo.maxBuiltInCommitDate() <= knownCommitDate) {
-      // Track only updates with more recent commits.
-      return;
-    }
-    final long installationId = nextInstallationId();
-    AppBuildInfo buildInfo = new AppBuildInfo(installationId);
-    pmc.edit()
-      .putLong(KEY_APP_INSTALLATION_ID, installationId)
-      .putLong(KEY_APP_COMMIT_DATE, buildInfo.maxCommitDate());
-    buildInfo.saveTo(pmc, KEY_APP_INSTALLATION_PREFIX + installationId);
-    pmc.apply();
-    this.currentBuildInformation = buildInfo;
-    resetAppVersionPushMessageCount();
   }
 
   private void trackChangesInAvailableFeatures () {
-    final long currentlyAvailableFeatures = FeatureAvailability.currentlyAvailableFeatures();
-    long previouslyAvailableFeatures;
-    boolean saveFeatures = false;
-    try {
-      previouslyAvailableFeatures = pmc.tryGetLong(KEY_FEATURES);
-    } catch (FileNotFoundException e) {
-      long previousInstallationId = currentBuildInformation != null ? currentBuildInformation.getInstallationId() - 1 : -1;
-      int previouslyInstalledVersionCode = previousInstallationId != -1 ?
-        AppBuildInfo.restoreVersionCode(pmc, KEY_APP_INSTALLATION_PREFIX + previousInstallationId) : 0;
-      if (previouslyInstalledVersionCode != 0) {
-        previouslyAvailableFeatures = FeatureAvailability.recoverAvailableFeaturesForAppVersionCode(previouslyInstalledVersionCode);
-      } else {
-        // Do not bombard with a dozen of pop-ups on clean app installations
-        previouslyAvailableFeatures = currentlyAvailableFeatures;
-      }
-      saveFeatures = true;
-    }
-    if (currentlyAvailableFeatures != previouslyAvailableFeatures) {
-      final long recentlyAddedFeatures = currentlyAvailableFeatures & (~previouslyAvailableFeatures);
-      final long recentlyRemovedFeatures = previouslyAvailableFeatures & (~currentlyAvailableFeatures);
-
-      long addedFeaturesNotifications = pmc.getLong(KEY_FEATURES_ADDED_NOTIFICATIONS, 0);
-      long removedFeaturesNotifications = pmc.getLong(KEY_FEATURES_REMOVED_NOTIFICATIONS, 0);
-
-      addedFeaturesNotifications &= ~recentlyRemovedFeatures;
-      addedFeaturesNotifications |= recentlyAddedFeatures;
-
-      removedFeaturesNotifications &= ~recentlyAddedFeatures;
-      removedFeaturesNotifications |= recentlyRemovedFeatures;
-
-      pmc.edit()
-        .putLong(KEY_FEATURES_ADDED_NOTIFICATIONS, addedFeaturesNotifications)
-        .putLong(KEY_FEATURES_REMOVED_NOTIFICATIONS, removedFeaturesNotifications)
-        .apply();
-
-      this._addedFeaturesNotifications = addedFeaturesNotifications;
-      this._removedFeaturesNotifications = removedFeaturesNotifications;
-
-      saveFeatures = true;
-    }
-    if (saveFeatures) {
-      pmc.putLong(KEY_FEATURES, currentlyAvailableFeatures);
-    }
   }
 
   public interface FeatureAvailabilityNotificationDismissListener {
@@ -7156,34 +7049,31 @@ public class Settings {
   }
 
   public String getPushMessageStats () {
-    return
-      "total: " + getReceivedPushMessageCountTotal() + " " +
-      "by_token: " + getReceivedPushMessageCountByToken() + " " +
-      "by_app_version: " + getReceivedPushMessageCountByAppVersion() + " ";
+    return "";
   }
 
   public long getReceivedPushMessageCountTotal () {
-    return pmc.getLong(KEY_PUSH_STATS_TOTAL_COUNT, 0);
+    return 0;
   }
 
   public long getReceivedPushMessageCountByAppVersion () {
-    return pmc.getLong(KEY_PUSH_STATS_CURRENT_APP_VERSION_COUNT, 0);
+    return 0;
   }
 
   public long getReceivedPushMessageCountByToken () {
-    return pmc.getLong(KEY_PUSH_STATS_CURRENT_TOKEN_COUNT, 0);
+    return 0;
   }
 
   public long getLastReceivedPushMessageSentTime () {
-    return pmc.getLong(KEY_PUSH_LAST_SENT_TIME, 0);
+    return 0;
   }
 
   public long getLastReceivedPushMessageReceivedTime () {
-    return pmc.getLong(KEY_PUSH_LAST_RECEIVED_TIME, 0);
+    return 0;
   }
 
   public int getLastReceivedPushMessageTtl () {
-    return pmc.getInt(KEY_PUSH_LAST_TTL, 0);
+    return 0;
   }
 
   public interface PushStatsListener {
@@ -7201,51 +7091,24 @@ public class Settings {
   }
 
   public void trackPushMessageReceived (long sentTime, long receivedTime, int ttl) {
-    final long totalReceivedCount = getReceivedPushMessageCountTotal() + 1;
-    final long currentVersionReceivedCount = getReceivedPushMessageCountByAppVersion() + 1;
-    final long currentTokenReceivedCount = getReceivedPushMessageCountByToken() + 1;
-    pmc.edit()
-      .putLong(KEY_PUSH_STATS_TOTAL_COUNT, totalReceivedCount)
-      .putLong(KEY_PUSH_STATS_CURRENT_APP_VERSION_COUNT, currentVersionReceivedCount)
-      .putLong(KEY_PUSH_STATS_CURRENT_TOKEN_COUNT, currentTokenReceivedCount)
-      .putLong(KEY_PUSH_LAST_SENT_TIME, sentTime)
-      .putLong(KEY_PUSH_LAST_RECEIVED_TIME, receivedTime)
-      .putInt(KEY_PUSH_LAST_TTL, ttl)
-      .apply();
-    for (PushStatsListener listener : pushStatsListeners) {
-      listener.onNewPushReceived();
-    }
   }
 
   public void resetAppVersionPushMessageCount () {
-    pmc.remove(KEY_PUSH_STATS_CURRENT_APP_VERSION_COUNT);
   }
 
   public void resetTokenPushMessageCount () {
-    pmc.remove(KEY_PUSH_STATS_CURRENT_TOKEN_COUNT);
   }
 
   public void setReportedPushServiceError (@Nullable String error) {
-    if (!StringUtils.isEmpty(error)) {
-      pmc.edit()
-        .putString(KEY_PUSH_REPORTED_ERROR, error)
-        .putLong(KEY_PUSH_REPORTED_ERROR_DATE, System.currentTimeMillis())
-        .apply();
-    } else {
-      pmc.edit()
-        .remove(KEY_PUSH_REPORTED_ERROR)
-        .remove(KEY_PUSH_REPORTED_ERROR_DATE)
-        .apply();
-    }
   }
 
   @Nullable
   public String getReportedPushServiceError () {
-    return pmc.getString(KEY_PUSH_REPORTED_ERROR, null);
+    return null;
   }
 
   public long getReportedPushServiceErrorDate () {
-    return pmc.getLong(KEY_PUSH_REPORTED_ERROR_DATE, 0);
+    return 0;
   }
 
   public String getDefaultLanguageForTranslateDraft () {

@@ -43,7 +43,6 @@ import org.thunderdog.challegram.navigation.SettingsWrap;
 import org.thunderdog.challegram.navigation.SettingsWrapBuilder;
 import org.thunderdog.challegram.navigation.ViewController;
 import org.thunderdog.challegram.support.ViewSupport;
-import org.thunderdog.challegram.sync.TemporaryNotification;
 import org.thunderdog.challegram.telegram.AccountSwitchReason;
 import org.thunderdog.challegram.telegram.GlobalAccountListener;
 import org.thunderdog.challegram.telegram.GlobalCountersListener;
@@ -146,20 +145,6 @@ public class MainActivity extends BaseActivity implements GlobalAccountListener,
       showExperimentalAlert();
     } else {
       initController(account.tdlib(), account.tdlib().authorizationStatus());
-    }
-
-    if (Config.AWAKE_ALL_TDLIB_INSTANCES) {
-      Tdlib currentTdlib = TdlibManager.instance().current();
-      currentTdlib.awaitConnection(() -> {
-        long pushId = Settings.instance().newPushId();
-        TDLib.Tag.notifications(pushId, currentTdlib.id(), "Syncing other accounts, since user launched the app.");
-        AtomicBoolean sentChangeLogs = new AtomicBoolean(currentTdlib.checkChangeLogs(false, false));
-        TdlibManager.instance().sync(pushId, TdlibAccount.NO_ID, null, false, false, 3, tdlib -> {
-          if (tdlib.checkChangeLogs(sentChangeLogs.get(), false))
-            sentChangeLogs.set(true);
-          LottieCache.instance().gc();
-        });
-      });
     }
   }
 
@@ -1472,22 +1457,6 @@ public class MainActivity extends BaseActivity implements GlobalAccountListener,
   public void onPause () {
     super.onPause();
     Log.i("MainActivity.onPause");
-    /*if (BuildConfig.DEBUG && Settings.instance().getNewSetting(Settings.SETTING_FLAG_FOREGROUND_SERVICE_ENABLED)) {
-      tdlib.ui().postDelayed(() -> {
-        ForegroundService.startForegroundTask(this,
-          Lang.getString(R.string.RetrievingMessages), Lang.getString(R.string.RetrievingText, tdlib.account().getLongName()),
-          U.getOtherNotificationChannel(),
-          0,
-          -1,
-          tdlib.accountId()
-        );
-        tdlib.sync(-1, () -> {
-          runOnUiThread(() -> {
-            ForegroundService.stopForegroundTask(this, -1, tdlib.accountId());
-          });
-        }, true, true);
-      }, 2000);
-    }*/
   }
 
   @Override
@@ -1498,7 +1467,6 @@ public class MainActivity extends BaseActivity implements GlobalAccountListener,
     tdlib.contacts().makeSilentPermissionCheck(this);
     tdlib.context().global().notifyResolvableProblemAvailabilityMightHaveChanged();
     tdlib.context().dateManager().checkCurrentDate();
-    UI.startNotificationService();
     TemporaryNotification.hide(this);
   }
 

@@ -20,14 +20,6 @@ val updateLanguages by tasks.registering(FetchLanguagesTask::class) {
   group = "Setup"
   description = "Generates and updates all strings.xml resources based on translations.telegram.org"
 }
-val validateApiTokens by tasks.registering(ValidateApiTokensTask::class) {
-  group = "Setup"
-  description = "Validates some API tokens to make sure they work properly and won't cause problems"
-}
-val updateExceptions by tasks.registering(UpdateExceptionsTask::class) {
-  group = "Setup"
-  description = "Updates exception class names with the app or TDLib version number in order to have separate group on Google Play Developer Console"
-}
 val generatePhoneFormat by tasks.registering(GeneratePhoneFormatTask::class) {
   group = "Setup"
   description = "Generates utility methods for phone formatting, e.g. +12345678901 -> +1 (234) 567 89-01"
@@ -61,30 +53,11 @@ android {
 
     buildConfigString("PROJECT_NAME", config.applicationName)
     buildConfigBool("SHARED_STL", Config.SHARED_STL)
-    buildConfigString("SAFETYNET_API_KEY", config.safetyNetToken)
-
-    buildConfigString("DOWNLOAD_URL", config.appDownloadUrl)
-    buildConfigString("GOOGLE_PLAY_URL", config.googlePlayUrl)
-    buildConfigString("GALAXY_STORE_URL", config.galaxyStoreUrl)
-    buildConfigString("HUAWEI_APPGALLERY_URL", config.huaweiAppGalleryUrl)
-    buildConfigString("AMAZON_APPSTORE_URL", config.amazonAppStoreUrl)
-
-    buildConfigString("TGX_EXTENSION", config.extension)
-
-    buildConfigString("JNI_VERSION", config.nativeLibraryVersion)
-    buildConfigString("LEVELDB_VERSION", config.leveldbVersion)
-
-    buildConfigString("TDLIB_REMOTE_URL", "https://github.com/tdlib/td")
-
-    buildConfigField("boolean", "EXPERIMENTAL", config.isExperimentalBuild.toString())
 
     buildConfigInt("TARGET_SDK_INT", config.targetSdkVersion)
 
     buildConfigInt("TELEGRAM_API_ID", config.telegramApiId)
     buildConfigString("TELEGRAM_API_HASH", config.telegramApiHash)
-
-    buildConfigString("TELEGRAM_RESOURCES_CHANNEL", Telegram.RESOURCES_CHANNEL)
-    buildConfigString("TELEGRAM_UPDATES_CHANNEL", Telegram.UPDATES_CHANNEL)
 
     buildConfigInt("EMOJI_VERSION", config.emojiVersion)
     buildConfigString("EMOJI_BUILTIN_ID", Emoji.BUILTIN_ID)
@@ -92,6 +65,18 @@ android {
     buildConfigString("LANGUAGE_PACK", Telegram.LANGUAGE_PACK)
 
     buildConfigString("THEME_FILE_EXTENSION", App.THEME_EXTENSION)
+
+    buildConfigString("JNI_VERSION", config.nativeLibraryVersion)
+    buildConfigString("LEVELDB_VERSION", config.leveldbVersion)
+
+    buildConfigString("TDLIB_REMOTE_URL", "https://github.com/tdlib/td")
+
+    buildConfigString("DOWNLOAD_URL", "https://telegram.org")
+    buildConfigString("GOOGLE_PLAY_URL", "")
+    buildConfigString("GALAXY_STORE_URL", "")
+    buildConfigString("AMAZON_APPSTORE_URL", "")
+
+    buildConfigField("boolean", "EXPERIMENTAL", config.isExperimentalBuild.toString())
 
     // Library versions in BuildConfig.java
 
@@ -232,10 +217,6 @@ android {
     versionName = "${config.majorVersion}.${minorVersion}"
   }
 
-  sourceSets.getByName("main") {
-    java.srcDirs("./src/google/java") // TODO: Exclude in FOSS variant
-  }
-
   lint {
     disable += "MissingTranslation"
     checkDependencies = true
@@ -265,14 +246,9 @@ android {
         versionCode = (sdk + 1)
         isDefault = sdk == Sdk.LATEST
 
-        val actualMinSdk = if (config.isHuaweiBuild) {
-          maxOf(variant.minSdk, Config.MIN_SDK_VERSION_HUAWEI)
-        } else {
-          variant.minSdk
-        }
-        val selectedMinSdk = maxOf(variant.minSdk, actualMinSdk)
-        minSdk = selectedMinSdk
-        if (selectedMinSdk < 21) {
+        val actualMinSdk = variant.minSdk
+        minSdk = actualMinSdk
+        if (actualMinSdk < 21) {
           proguardFile("proguard-r8-bug-android-4.x-workaround.pro")
         }
 
@@ -379,25 +355,15 @@ android {
     val sdk = (sdkFlavor.versionCode ?: fatal("null")) - 1
     val sdkVariant = Sdk.VARIANTS[sdk] ?: fatal("null")
 
-    val recaptchaVersion = when (sdkVariant.flavor) {
-      "legacy" -> libs.google.recaptcha.legacy
-      "lollipop" -> libs.google.recaptcha.lollipop
-      "latest" -> libs.google.recaptcha.latest
-      else -> error(sdkVariant.flavor)
-    }.get().version!!
-
     val versionCodeOverride = versionCode * 1000 + if (!buildType.isDebuggable) (sdk * 100 + abi) else 0
     val versionNameOverride = StringBuilder("${versionName}.${defaultConfig.versionCode}").apply {
       if (extra.has("app_version_suffix")) {
         append(extra["app_version_suffix"])
       }
-      if (config.extension != "none") {
-        append("-${config.extension}")
-      }
       if (!sdkVariant.displayName.isNullOrEmpty()) {
         append("-${sdkVariant.displayName}")
       }
-      if (abiVariant.displayName != "universal" || (config.extension == "none" && sdkVariant.displayName.isNullOrEmpty())) {
+      if (abiVariant.displayName != "universal" || (sdkVariant.displayName.isNullOrEmpty())) {
         append("-${abiVariant.displayName}")
       }
       if (extra.has("app_name_suffix")) {
@@ -413,7 +379,6 @@ android {
     buildConfigField("int", "ORIGINAL_VERSION_CODE", versionCode.toString())
     buildConfigField("int", "ABI", abi.toString())
     buildConfigField("String", "ORIGINAL_VERSION_NAME", "\"${versionName}.${defaultConfig.versionCode}\"")
-    buildConfigField("String", "RECAPTCHA_VERSION", "\"${recaptchaVersion}\"")
 
     outputs.map { it as ApkVariantOutputImpl }.forEach { output ->
       output.versionCodeOverride = versionCodeOverride
@@ -454,21 +419,16 @@ gradle.projectsEvaluated {
       generateResourcesAndThemes,
       checkEmojiKeyboard,
       generatePhoneFormat,
-      updateExceptions,
     )
   }
   tasks.named {
     it.startsWith("pre") && it.endsWith("ReleaseBuild")
   }.configureEach {
     dependsOn(updateLanguages)
-    if (!config.isExperimentalBuild) {
-      dependsOn(validateApiTokens)
-    }
   }
 }
 
 dependencies {
-  implementation(project(":extension:${config.extension}"))
   // TDLib: https://github.com/tdlib/td/blob/master/CHANGELOG.md
   implementation(project(":tdlib"))
   implementation(project(":tgcalls"))
@@ -503,11 +463,6 @@ dependencies {
     libs.androidx.browser.latest
   )
   flavorImplementation(
-    libs.androidx.work.runtime.legacy,
-    libs.androidx.work.runtime.lollipop,
-    libs.androidx.work.runtime.latest
-  )
-  flavorImplementation(
     libs.androidx.exifinterface.legacy,
     libs.androidx.exifinterface.latest
   )
@@ -536,60 +491,6 @@ dependencies {
     libs.androidx.camera.view.legacy,
     libs.androidx.camera.view.latest
   )
-  // Google Play Services: https://developers.google.com/android/guides/releases
-  flavorImplementation(
-    libs.google.play.services.base.legacy,
-    libs.google.play.services.base.lollipop,
-    libs.google.play.services.base.latest
-  )
-  flavorImplementation(
-    libs.google.play.services.basement.legacy,
-    libs.google.play.services.basement.lollipop,
-    libs.google.play.services.basement.latest
-  )
-  flavorImplementation(
-    libs.google.play.services.maps.legacy,
-    libs.google.play.services.maps.latest
-  )
-  flavorImplementation(
-    libs.google.play.services.location.legacy,
-    libs.google.play.services.location.latest
-  )
-  flavorImplementation(
-    libs.google.play.services.safetynet.legacy,
-    libs.google.play.services.safetynet.latest
-  )
-  // ML Kit: https://developers.google.com/ml-kit/release-notes
-  flavorImplementation(
-    libs.google.play.services.mlkit.barcode.scanning.legacy,
-    libs.google.play.services.mlkit.barcode.scanning.latest
-  )
-  flavorImplementation(
-    libs.google.mlkit.language.id.legacy,
-    libs.google.mlkit.language.id.latest
-  )
-  // Firebase: https://firebase.google.com/support/release-notes/android
-  flavorImplementation(
-    libs.google.firebase.messaging.legacy,
-    libs.google.firebase.messaging.lollipop,
-    libs.google.firebase.messaging.latest
-  ) {
-    exclude(group = "com.google.firebase", module = "firebase-core")
-    exclude(group = "com.google.firebase", module = "firebase-analytics")
-    exclude(group = "com.google.firebase", module = "firebase-measurement-connector")
-  }
-  // Play Integrity: https://developer.android.com/google/play/integrity/reference/com/google/android/play/core/release-notes
-  flavorImplementation(
-    libs.google.play.integrity.legacy,
-    libs.google.play.integrity.lollipop,
-    libs.google.play.integrity.latest
-  )
-  // ReCaptcha: https://cloud.google.com/recaptcha/docs/release-notes
-  flavorImplementation(
-    libs.google.recaptcha.legacy,
-    libs.google.recaptcha.lollipop,
-    libs.google.recaptcha.latest
-  )
   // AndroidX/media: https://github.com/androidx/media/blob/release/RELEASENOTES.md
   flavorImplementation(
     libs.androidx.media.common.legacy,
@@ -617,8 +518,6 @@ dependencies {
     libs.androidx.media.exoplayer.hls.latest
   )
   latestImplementation(libs.androidx.media.inspector.latest)
-  // Play In-App Updates: https://developer.android.com/reference/com/google/android/play/core/release-notes-in_app_updates
-  implementation(libs.google.play.app.update)
   // The Checker Framework: https://checkerframework.org/CHANGELOG.md
   compileOnly(libs.checkerframework)
   // OkHttp: https://github.com/square/okhttp/blob/master/CHANGELOG.md
@@ -647,11 +546,4 @@ dependencies {
 
   // mp4parser: https://github.com/sannies/mp4parser/releases
   implementation(libs.mp4parser.isoparser)
-}
-
-if (!config.isExperimentalBuild) {
-  apply(plugin = libs.plugins.google.services.get().pluginId)
-  if (config.isHuaweiBuild) {
-    apply(plugin = libs.huawei.agconnect.get().group)
-  }
 }

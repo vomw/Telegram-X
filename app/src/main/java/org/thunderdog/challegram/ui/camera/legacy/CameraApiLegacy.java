@@ -736,9 +736,7 @@ public class CameraApiLegacy extends CameraApi implements Camera.PreviewCallback
       if (orientation == 90) {
         orientation = 270;
       }
-      if ("Huawei".equals(Build.MANUFACTURER) && "angler".equals(Build.PRODUCT) && orientation == 270) {
-        orientation = 90;
-      }
+
     } else {
       orientation = (cameraInfo.orientation - orientation + 360) % 360;
     }

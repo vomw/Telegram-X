@@ -104,10 +104,6 @@ public class MediaPreviewSimple extends MediaPreview {
     }
 
     switch (Settings.instance().getMapProviderType(true)) {
-      case Settings.MAP_PROVIDER_GOOGLE: {
-        this.targetImage = new ImageFileRemote(tdlib, U.getMapPreview(location.latitude, location.longitude, 16, false, size, size), new TdApi.FileTypeThumbnail());
-        break;
-      }
       case Settings.MAP_PROVIDER_TELEGRAM:
       default: {
         int scale = Screen.density() >= 2.0f ? 2 : 1;

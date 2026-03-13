@@ -692,7 +692,7 @@ public class Log {
     if (!loaded) {
       load();
     }
-    boolean force = Config.USE_CRASHLYTICS && level <= LEVEL_ERROR;
+    boolean force = false;
     boolean hasPermission = checkPermission(tag, level);
     if (hasPermission || force) {
       final String sourceMessage = args.length != 0 ? String.format(Locale.US, fmt, args) : fmt;
@@ -728,9 +728,6 @@ public class Log {
           } else {
             android.util.Log.println(priority, LOG_TAG, androidMessage);
           }
-        }
-        if (force) {
-          logExternally(androidMessage, t);
         }
       }
       if (hasPermission && ((settings & SETTING_DISABLE_FULLY) == 0 || isCapturing)) {
@@ -768,18 +765,9 @@ public class Log {
   }
 
   public static void initLibraries (Context activity) {
-    if (Config.USE_CRASHLYTICS) {
-      // io.fabric.sdk.android.Fabric.with(this, new com.crashlytics.android.Crashlytics());
-    }
   }
 
   public static void logExternally (@NonNull String message, @Nullable Throwable t) {
-    if (Config.USE_CRASHLYTICS) {
-      /*com.crashlytics.android.Crashlytics.log(message);
-      if (t != null) {
-        com.crashlytics.android.Crashlytics.logException(t);
-      }*/
-    }
   }
 
   public static void log (int tag, int level, @NonNull String fmt, Object... args) {

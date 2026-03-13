@@ -40,7 +40,6 @@ import org.thunderdog.challegram.data.TD;
 import org.thunderdog.challegram.loader.ImageCache;
 import org.thunderdog.challegram.loader.ImageFile;
 import org.thunderdog.challegram.loader.ImageReader;
-import org.thunderdog.challegram.push.FirebaseDeviceTokenRetriever;
 import org.thunderdog.challegram.theme.ColorId;
 import org.thunderdog.challegram.theme.Theme;
 import org.thunderdog.challegram.theme.ThemeId;
@@ -269,8 +268,6 @@ public class TdlibNotificationUtils {
     return switch (deviceToken.getConstructor()) {
       case TdApi.DeviceTokenFirebaseCloudMessaging.CONSTRUCTOR ->
         DeviceTokenType.FIREBASE_CLOUD_MESSAGING;
-      case TdApi.DeviceTokenHuaweiPush.CONSTRUCTOR ->
-        DeviceTokenType.HUAWEI_PUSH_SERVICE;
       case TdApi.DeviceTokenSimplePush.CONSTRUCTOR ->
         DeviceTokenType.SIMPLE_PUSH_SERVICE;
       default -> {

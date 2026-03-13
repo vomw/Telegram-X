@@ -64,16 +64,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager.widget.PagerAdapter;
 
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.PendingResult;
-import com.google.android.gms.common.api.Status;
-import com.google.android.gms.location.LocationListener;
-import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.LocationSettingsRequest;
-import com.google.android.gms.location.LocationSettingsResult;
-import com.google.android.gms.location.LocationSettingsStatusCodes;
-
 import org.drinkless.tdlib.Client;
 import org.drinkless.tdlib.TdApi;
 import org.thunderdog.challegram.BaseActivity;
@@ -7696,19 +7686,6 @@ public class MessagesController extends ViewController<MessagesController.Argume
       builder.setPositiveButton(Lang.getOK(), (dialog, which) -> shareCurrentLocation(oneTime));
       builder.setNegativeButton(Lang.getString(R.string.Cancel), (dialog, which) -> dialog.dismiss());
       showAlert(builder);
-    }
-  }
-
-  private GoogleApiClient googleClient;
-
-  private void closeGoogleClient () {
-    if (googleClient != null) {
-      try {
-        googleClient.disconnect();
-      } catch (Throwable t) {
-        Log.w("GoogleApiClient throws", t);
-      }
-      googleClient = null;
     }
   }
 

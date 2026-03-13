@@ -1540,7 +1540,6 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
 
   @UiThread
   public final void openUpdateAlert (CharSequence text) {
-    openAlert(R.string.AppUpdateRequiredTitle, text, Lang.getString(R.string.AppUpdateOk), (dialog, which) -> Intents.openSelfGooglePlay(), 0);
   }
 
   public final AlertDialog showAlert (AlertDialog.Builder b) {
@@ -1822,12 +1821,6 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
   }
 
   public void openMissingGoogleMapsAlert () {
-    AlertDialog.Builder b = new AlertDialog.Builder(context, Theme.dialogTheme());
-    b.setTitle(Lang.getString(R.string.AppName));
-    b.setMessage(Lang.getString(R.string.NoGoogleMaps));
-    b.setPositiveButton(Lang.getString(R.string.Install), (dialog, which) -> Intents.openGooglePlay("com.google.android.apps.maps"));
-    b.setNegativeButton(Lang.getString(R.string.Cancel), (dialog, which) -> dialog.dismiss());
-    showAlert(b);
   }
 
   private AlertDialog linkWarningDialog;
@@ -3415,9 +3408,6 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
     if (item.getBoolValue())
       value = !value;
     Settings.instance().setNewSetting(item.getLongId(), value);
-    if (value && item.getLongId() == Settings.SETTING_FLAG_DOWNLOAD_BETAS) {
-      context().appUpdater().checkForUpdates();
-    }
   }
 
   protected void onFocusStateChanged () { }

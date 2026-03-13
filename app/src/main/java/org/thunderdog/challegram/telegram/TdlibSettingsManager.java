@@ -617,7 +617,7 @@ public class TdlibSettingsManager implements CleanupStartupDelegate {
 
   @Nullable
   private static TdApi.DeviceToken getRegisteredDeviceToken (int accountId) {
-    @DeviceTokenType int tokenType = Settings.instance().getInt(key(DEVICE_TOKEN_TYPE_KEY, accountId), DeviceTokenType.FIREBASE_CLOUD_MESSAGING);
+    @DeviceTokenType int tokenType = Settings.instance().getInt(key(DEVICE_TOKEN_TYPE_KEY, accountId), DeviceTokenType.SIMPLE_PUSH_SERVICE);
     String tokenOrEndpoint = Settings.instance().getString(key(DEVICE_TOKEN_OR_ENDPOINT_KEY, accountId), null);
     return Settings.newDeviceToken(tokenType, tokenOrEndpoint);
   }
