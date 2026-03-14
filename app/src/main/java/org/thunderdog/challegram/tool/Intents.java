@@ -147,11 +147,13 @@ public class Intents {
   }
 
   public static boolean openGooglePlay (String packageName) {
-    return false;
+    return
+      openUri("market://details?id=" + packageName) ||
+      openUri("https://play.google.com/store/apps/details?id=" + packageName);
   }
 
   public static boolean openSelfGooglePlay () {
-    return false;
+    return Intents.openGooglePlay(BuildConfig.APPLICATION_ID);
   }
 
   public static boolean openUri (String uri) {
@@ -586,22 +588,34 @@ public class Intents {
   }
 
   public static void openDirections (double latitude, double longitude, String title, String address) {
-    openMap(latitude, longitude, title, address);
+    try {
+      Intent intent;
+
+      String destination = URLEncoder.encode(getDestination(latitude, longitude, title, address, false), "UTF-8");
+
+      intent = new Intent(Intent.ACTION_VIEW);
+      intent.setData(Uri.parse("https://www.google.com/maps/dir/?api=1&destination=" + destination));
+
+      UI.startActivity(intent);
+    } catch (Throwable t) {
+      Log.w("Cannot launch directions intent", t);
+      openMap(latitude, longitude, title, address);
+    }
   }
 
   public static boolean openMap (double latitude, double longitude, String title, String address) {
     try {
-      String query;
-      if (!StringUtils.isEmpty(title)) {
-        query = String.format(Locale.US, "%f,%f(%s)", latitude, longitude, title);
-      } else {
-        query = String.format(Locale.US, "%f,%f", latitude, longitude);
-      }
-      Intent intent = new Intent(Intent.ACTION_VIEW);
-      intent.setData(Uri.parse("geo:0,0?q=" + Uri.encode(query)));
+      Intent intent;
+
+      String destination = URLEncoder.encode(getDestination(latitude, longitude, title, address, true), "UTF-8");
+
+      intent = new Intent(Intent.ACTION_VIEW);
+      intent.setData(Uri.parse("https://www.google.com/maps/search/?api=1&query=" + destination));
+
       UI.startActivity(intent);
       return true;
     } catch (Throwable t) {
+      Log.w("Cannot launch map intent", t);
       return openMap(latitude, longitude);
     }
   }

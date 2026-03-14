@@ -55,6 +55,7 @@ import org.thunderdog.challegram.navigation.HeaderView;
 import org.thunderdog.challegram.navigation.NavigationController;
 import org.thunderdog.challegram.navigation.RootDrawable;
 import org.thunderdog.challegram.navigation.ViewController;
+import org.thunderdog.challegram.service.NetworkListenerService;
 import org.thunderdog.challegram.telegram.TdlibDelegate;
 import org.thunderdog.challegram.telegram.TdlibManager;
 import org.thunderdog.challegram.theme.Theme;
@@ -175,14 +176,46 @@ public class UI {
 
   public static boolean startService (Intent intent, boolean isForeground, boolean forcePermissionRequest, @Nullable CancellationSignal signal) {
     if (isForeground) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        BaseActivity activity = getUiContext();
+        if (activity != null) {
+          activity.requestCustomPermissions(new String[] {Manifest.permission.FOREGROUND_SERVICE}, (code, permissions, grantResults, grantCount) -> {
+            if (signal == null || !signal.isCanceled()) {
+              startServiceImpl(activity, intent, true);
+            }
+          });
+          return true;
+        } else {
+          Log.e("Cannot start foreground service, because activity not found.");
+        }
+      }
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         return startServiceImpl(getContext(), intent, true);
+      }
+    }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && forcePermissionRequest) {
+      BaseActivity activity = getUiContext();
+      if (activity != null) {
+        activity.requestCustomPermissions(new String[] {Manifest.permission.FOREGROUND_SERVICE}, (code, permissions, grantResults, grantCount) -> {
+          if (signal == null || !signal.isCanceled()) {
+            startServiceImpl(activity, intent, false);
+          }
+        });
+        return true;
+      } else {
+        Log.e("Cannot request foreground service permission, because activity not found.");
       }
     }
     return startServiceImpl(getContext(), intent, false);
   }
 
   private static long lastResumeTime;
+
+  public static void startNotificationService () {
+    if (Config.SERVICES_ENABLED) {
+      startService(new Intent(getAppContext(), NetworkListenerService.class), false, false, null);
+    }
+  }
 
   public static boolean isTablet () {
     if (isTablet == null) {

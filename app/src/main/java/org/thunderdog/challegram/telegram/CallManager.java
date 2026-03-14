@@ -94,7 +94,11 @@ public class CallManager implements GlobalCallListener {
         serviceCancellationSignal = null;
       }
       if (call != null) {
+        Intent intent = new Intent(UI.getAppContext(), TGCallService.class);
+        intent.putExtra("account_id", tdlib.id());
+        intent.putExtra("call_id", call.id);
         serviceCancellationSignal = new CancellationSignal();
+        UI.startService(intent, UI.getUiState() != UI.State.RESUMED, true, serviceCancellationSignal);
 
         navigateToCallController(currentCallTdlib, currentCall);
       }

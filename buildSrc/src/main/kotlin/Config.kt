@@ -21,6 +21,7 @@ import java.util.*
 
 object Config {
   const val MIN_SDK_VERSION = 16
+  const val MIN_SDK_VERSION_HUAWEI = 17
   val JAVA_VERSION = org.gradle.api.JavaVersion.VERSION_21
   val ANDROIDX_MEDIA_EXTENSIONS = arrayOf(
     "decoder_ffmpeg",
@@ -53,12 +54,14 @@ data class PullRequest (
 data class ApplicationConfig(
   val applicationName: String,
   val applicationId: String,
+  val extension: String,
   val sourceCodeUrl: String,
 
   val applicationVersion: Int,
   val majorVersion: Int,
 
   val isExperimentalBuild: Boolean,
+  val isHuaweiBuild: Boolean,
   val forceOptimize: Boolean,
   val doNotObfuscate: Boolean,
 
@@ -75,6 +78,12 @@ data class ApplicationConfig(
 
   val telegramApiId: Int,
   val telegramApiHash: String,
+  val safetyNetToken: String?,
+  val appDownloadUrl: String?,
+  val googlePlayUrl: String?,
+  val galaxyStoreUrl: String?,
+  val huaweiAppGalleryUrl: String?,
+  val amazonAppStoreUrl: String?,
 
   val pullRequests: List<PullRequest>,
 

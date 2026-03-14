@@ -1,4 +1,4 @@
-# [Telegram X](https://telegram.org): Change Logs 
+# [Telegram X](https://play.google.com/store/apps/details?id=org.thunderdog.challegram): Change Logs 
 
 ![Telegram X](/images/feature.png)
 

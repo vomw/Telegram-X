@@ -42,3 +42,10 @@ dependencies {
   implementation(libs.okhttp.latest)
   implementation(libs.kotlinx.serialization.json)
 }
+
+apply(from = "${rootDir.parentFile}/properties.gradle.kts")
+if (extra["huawei"] == true) {
+  dependencies {
+    implementation(libs.huawei.agconnect)
+  }
+}

@@ -118,8 +118,10 @@ public class Config {
 
   public static final boolean TEST_CHANGELOG = false;
 
+  public static final boolean SERVICES_ENABLED = true; // !BuildConfig.DEBUG;
+
   public static final boolean PIN_BITMAP_ENABLED = Build.VERSION.SDK_INT < Build.VERSION_CODES.M && Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB;
-  public static final boolean GCM_ENABLED = false;
+  public static final boolean GCM_ENABLED = true;
 
   public static final boolean ALLOW_SYSTEM_EMOJI = BuildConfig.DEBUG;
 
@@ -173,6 +175,7 @@ public class Config {
   public static final boolean ROUND_VIDEOS_RECORD_SUPPORTED = Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2;
 
   public static final boolean DEBUG_CLIPPING = false;
+  public static final boolean USE_CRASHLYTICS = false;
 
   public static final boolean CALL_FROM_PREVIEW = false;
 
@@ -290,7 +293,7 @@ public class Config {
   public static final boolean INSTANT_VIEW_WRONG_LAYOUT = false;
 
   public static final boolean QR_AVAILABLE = true;
-  public static final boolean QR_FORCE_ZXING = true;
+  public static final boolean QR_FORCE_ZXING = false;
   public static final boolean MANAGE_STORAGE_PERMISSION_AVAILABLE = false; // Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q;
 
   public static final boolean VIDEO_CLOUD_PLAYBACK_AVAILABLE = true;
@@ -311,7 +314,7 @@ public class Config {
 
   public static final boolean USE_HARDWARE_PHOTO_VIEWER_CONFIG = false;
 
-
+  public static final boolean REQUIRE_FIREBASE_SERVICES_FOR_SAFETYNET = false;
 
   public static final boolean USE_INPUT_VIEW_CLIPPING_FIX = false;
 

@@ -36,6 +36,15 @@ import androidx.collection.SparseArrayCompat;
 import androidx.core.os.CancellationSignal;
 import androidx.core.util.Pair;
 
+import com.google.android.gms.tasks.Task;
+import com.google.android.play.core.integrity.IntegrityManager;
+import com.google.android.play.core.integrity.IntegrityManagerFactory;
+import com.google.android.play.core.integrity.IntegrityTokenRequest;
+import com.google.android.play.core.integrity.IntegrityTokenResponse;
+import com.google.android.recaptcha.RecaptchaAction;
+import com.google.android.recaptcha.RecaptchaTasksClient;
+import com.google.firebase.FirebaseOptions;
+
 import org.drinkless.tdlib.Client;
 import org.drinkless.tdlib.TdApi;
 import org.drinkmore.Tracer;
@@ -120,6 +129,7 @@ import me.vkryl.core.lambda.RunnableData;
 import me.vkryl.core.lambda.RunnableInt;
 import me.vkryl.core.lambda.RunnableLong;
 import me.vkryl.core.util.ConditionalExecutor;
+import tgx.app.RecaptchaProviderRegistry;
 import tgx.td.ChatId;
 import tgx.td.ChatPosition;
 import tgx.td.JSON;
@@ -1294,6 +1304,8 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
         context().onUpdateAccountProfile(id(), myUser, true);
       }
     }
+    if (newStatus == Status.UNAUTHORIZED)
+      checkChangeLogs(false, false);
 
     if (newStatus == Status.READY && stressTest > 0) {
       clientHolder().sendClose();
@@ -1370,6 +1382,57 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
         Td.assertAuthorizationState_ba756b5f();
         throw Td.unsupported(state);
     }
+  }
+
+  public boolean checkChangeLogs (boolean alreadySent, boolean test) {
+    final int status = authorizationStatus();
+    if (status != Status.READY && status != Status.UNAUTHORIZED) {
+      return false;
+    }
+    final String key = accountId + "_app_version";
+    if (status == Status.UNAUTHORIZED || alreadySent) {
+      Settings.instance().putInt(key, BuildConfig.ORIGINAL_VERSION_CODE);
+      return alreadySent;
+    }
+    int prevVersion = test || Config.TEST_CHANGELOG ? 0 : Settings.instance().getInt(key, 0);
+    if (prevVersion != BuildConfig.ORIGINAL_VERSION_CODE) {
+      List<TdApi.InputMessageContent> updates = new ArrayList<>();
+      List<TdApi.Function<?>> functions = new ArrayList<>();
+      ChangeLogList.collectChangeLogs(prevVersion, functions, updates, test);
+      if (!updates.isEmpty()) {
+        incrementReferenceCount(REFERENCE_TYPE_JOB); // starting task
+        functions.add(new TdApi.CreatePrivateChat(TdConstants.TELEGRAM_ACCOUNT_ID, false));
+        if (options.telegramServiceNotificationsChatId != 0 && options.telegramServiceNotificationsChatId != TdConstants.TELEGRAM_ACCOUNT_ID) {
+          functions.add(new TdApi.GetChat(options.telegramServiceNotificationsChatId));
+        }
+        AtomicInteger remainingFunctions = new AtomicInteger(functions.size());
+        Client.ResultHandler handler = object -> {
+          if (object.getConstructor() == TdApi.Error.CONSTRUCTOR) {
+            Log.e("Received error while posting change log: %s", TD.toErrorString(object));
+          }
+          if (remainingFunctions.decrementAndGet() == 0) {
+            AtomicInteger remainingUpdates = new AtomicInteger(updates.size());
+            long chatId = serviceNotificationsChatId();
+            Client.ResultHandler localMessageHandler = message -> {
+              if (message.getConstructor() == TdApi.Error.CONSTRUCTOR) {
+                Log.e("Received error while sending change log: %s", TD.toErrorString(object));
+              }
+              if (remainingUpdates.decrementAndGet() == 0) {
+                decrementReferenceCount(REFERENCE_TYPE_JOB); // ending task
+              }
+            };
+            for (TdApi.InputMessageContent content : updates) {
+              client().send(new TdApi.AddLocalMessage(chatId, new TdApi.MessageSenderUser(TdConstants.TELEGRAM_ACCOUNT_ID) /*TODO: @tgx_android?*/, null, true, content), localMessageHandler);
+            }
+          }
+        };
+        for (TdApi.Function<?> function : functions) {
+          client().send(function, handler);
+        }
+      }
+      Settings.instance().putInt(key, BuildConfig.ORIGINAL_VERSION_CODE);
+    }
+    return true;
   }
 
   // Startup
@@ -5800,14 +5863,29 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
     return deviceToken == null ? Settings.instance().getDeviceToken() : deviceToken;
   }
 
+  public String safetyNetApiKey () {
+    // TODO: server config
+    return BuildConfig.SAFETYNET_API_KEY;
+  }
+
   public TdApi.PhoneNumberAuthenticationSettings phoneNumberAuthenticationSettings (Context context) {
+    TdApi.FirebaseAuthenticationSettings firebaseAuthenticationSettings = null;
+    String safetyNetApiKey = safetyNetApiKey();
+    if (StringUtils.isEmpty(safetyNetApiKey)) {
+      TDLib.Tag.safetyNet("Ignoring Firebase authentication, because SafetyNet API_KEY is unset");
+    } else if (Config.REQUIRE_FIREBASE_SERVICES_FOR_SAFETYNET && !U.isGooglePlayServicesAvailable(context)) {
+      TDLib.Tag.safetyNet("Ignoring Firebase authentication, because Firebase services are unavailable");
+    } else {
+      TDLib.Tag.safetyNet("Enabling Firebase authentication for the next request");
+      firebaseAuthenticationSettings = new TdApi.FirebaseAuthenticationSettingsAndroid();
+    }
     return new TdApi.PhoneNumberAuthenticationSettings(
       false, // TODO transparently request permission & enter flash call
       true,
       false, // TODO check if passed phone number is inserted in the current phone
       true,  // TODO check current phone number when possible
       false, // TODO for faster login when SMS method is chosen
-      null,
+      firebaseAuthenticationSettings,
       Settings.instance().getAuthenticationTokens()
     );
   }
@@ -5842,6 +5920,14 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
             case TdApi.DeviceTokenFirebaseCloudMessaging.CONSTRUCTOR:
               tokenOrEndpoint = ((TdApi.DeviceTokenFirebaseCloudMessaging) deviceToken).token;
               break;
+            case TdApi.DeviceTokenHuaweiPush.CONSTRUCTOR: {
+              tokenOrEndpoint = ((TdApi.DeviceTokenHuaweiPush) deviceToken).token;
+              final String huaweiTokenPrefix = "huawei://";
+              if (!tokenOrEndpoint.startsWith(huaweiTokenPrefix)) {
+                tokenOrEndpoint = huaweiTokenPrefix + tokenOrEndpoint;
+              }
+              break;
+            }
             case TdApi.DeviceTokenSimplePush.CONSTRUCTOR:
               tokenOrEndpoint = ((TdApi.DeviceTokenSimplePush) deviceToken).endpoint;
               break;
@@ -5878,6 +5964,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
       params.put("data", fingerprint);
     }
     params.put("tz_offset", timeZoneOffset);
+    params.put("recaptcha", BuildConfig.RECAPTCHA_VERSION);
 
     Map<String, Object> git = new LinkedHashMap<>();
     git.put("remote", BuildConfig.REMOTE_URL.replaceAll("^(https?://)?github\\.com/", ""));
@@ -5947,6 +6034,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
     final boolean isService = isServiceInstance();
     client.send(new TdApi.SetOption("use_quick_ack", new TdApi.OptionValueBoolean(true)), okHandler);
     client.send(new TdApi.SetOption("use_pfs", new TdApi.OptionValueBoolean(true)), okHandler);
+    client.send(new TdApi.SetOption("is_emulator", new TdApi.OptionValueBoolean(isEmulator = Settings.instance().isEmulator())), okHandler);
     if (isService) {
       updateNotificationParameters(client);
     } else {
@@ -5987,7 +6075,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
   }
 
   public boolean hasUrgentInAppUpdate () {
-    return false;
+    return options.forceInAppUpdate;
   }
 
   public String language () {
@@ -6357,6 +6445,19 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
       }
       // cache().setPauseStatusRefreshers(!isOnline);
     }
+  }
+
+  private boolean isEmulator;
+
+  public void setIsEmulator (boolean isEmulator) {
+    if (this.isEmulator != isEmulator) {
+      this.isEmulator = isEmulator;
+      performOptional(client -> client.send(new TdApi.SetOption("is_emulator", new TdApi.OptionValueBoolean(isEmulator)), okHandler()), null);
+    }
+  }
+
+  public boolean isEmulator () {
+    return isEmulator;
   }
 
   public void sync (long pushId, @Nullable Runnable after, boolean needNotifications, boolean needNetworkRequest) {
@@ -8886,6 +8987,10 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
     ui().sendMessage(ui().obtainMessage(MSG_ACTION_DISPATCH_TERMS_OF_SERVICE, update));
   }
 
+  public interface ApplicationVerificationCallback {
+    void onApplicationVerificationResult (@NonNull String data);
+  }
+
   public static final class ApplicationVerificationException extends RuntimeException {
     public ApplicationVerificationException (@NonNull String message) {
       super(message);
@@ -8895,14 +9000,106 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
       super(message, cause);
     }
 
-
-
+    public static String formatPlayIntegrityMessage (Exception e) {
+      if (e == null) return "NULL";
+      String str = "";
+      if (e.getClass() != null && e.getClass().getSimpleName() != null) {
+        str = e.getClass().getSimpleName();
+        if (str == null) str = "";
+      }
+      if (e.getMessage() != null) {
+        if (str.length() > 0) str += " ";
+        str += e.getMessage();
+      }
+      return str.toUpperCase().replaceAll(" ", "_");
+    }
 
     public static String formatReCaptchaMessage (Exception e) {
       if (e == null) return "NULL";
       if (e.getMessage() == null) return "MSG_NULL";
       return e.getMessage().replaceAll(" ", "_").toUpperCase();
     }
+  }
+
+  public void requestPlayIntegrity (long verificationId, String nonce, ApplicationVerificationCallback callback) {
+    TDLib.Tag.playIntegrity("Received Play Integrity request verificationId=%d", verificationId);
+    RunnableData<Exception> onError = e -> {
+      TDLib.Tag.playIntegrity("failure verificationId=%d: %s", verificationId, Log.toString(e));
+      final String error;
+      if (e instanceof ApplicationVerificationException) {
+        error = e.getMessage();
+      } else {
+        error = "PLAYINTEGRITY_FAILED_EXCEPTION_" + ApplicationVerificationException.formatPlayIntegrityMessage(e);
+      }
+      callback.onApplicationVerificationResult(error);
+    };
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
+      onError.runWithData(new ApplicationVerificationException("PLAYINTEGRITY_FAILED_SDK_TOO_LOW_" + Build.VERSION.SDK_INT));
+      return;
+    }
+    long projectId = 0;
+    try {
+      FirebaseOptions options = FirebaseOptions.fromResource(UI.getAppContext());
+      String projectIdRaw = options != null ? options.getGcmSenderId() : "";
+      if (!StringUtils.isEmpty(projectIdRaw)) {
+        projectId = Long.parseLong(projectIdRaw);
+      } else {
+        throw new IllegalStateException();
+      }
+    } catch (Exception e) {
+      onError.runWithData(new ApplicationVerificationException("PLAYINTEGRITY_FAILED_EXCEPTION_NOPROJECT"));
+      return;
+    }
+    try {
+      IntegrityTokenRequest request = IntegrityTokenRequest.builder()
+        .setNonce(nonce)
+        .setCloudProjectNumber(projectId)
+        .build();
+      IntegrityManager integrityManager = IntegrityManagerFactory.create(UI.getAppContext());
+      Task<IntegrityTokenResponse> integrityTokenResponse = integrityManager.requestIntegrityToken(request);
+      integrityTokenResponse
+        .addOnSuccessListener(r -> {
+          final String token = r.token();
+          if (token != null) {
+            TDLib.Tag.playIntegrity("success verificationId=%d: %s", verificationId, token);
+            callback.onApplicationVerificationResult(token);
+          } else {
+            onError.runWithData(new ApplicationVerificationException("PLAYINTEGRITY_FAILED_EXCEPTION_NULL"));
+          }
+        })
+        .addOnFailureListener(onError::runWithData);
+    } catch (Exception e) {
+      onError.runWithData(e);
+    }
+  }
+
+  public void requestRecaptcha (long verificationId, String action, String recaptchaKeyId, ApplicationVerificationCallback callback) {
+    TDLib.Tag.recaptcha("Received ReCaptcha request verificationId=%d action=%s", verificationId, action);
+    RunnableData<ApplicationVerificationException> onError = e -> {
+      TDLib.Tag.recaptcha("failure verificationId=%d: %s", verificationId, Log.toString(e));
+      callback.onApplicationVerificationResult(e.getMessage());
+    };
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
+      onError.runWithData(new ApplicationVerificationException("RECAPTCHA_FAILED_SDK_TOO_LOW_" + Build.VERSION.SDK_INT));
+      return;
+    }
+    RunnableData<RecaptchaTasksClient> actor = client -> {
+      client.executeTask(RecaptchaAction.custom(action))
+        .addOnSuccessListener(token -> {
+          if (token != null) {
+            TDLib.Tag.recaptcha("success verificationId=%d", verificationId);
+            callback.onApplicationVerificationResult(token);
+          } else {
+            onError.runWithData(new ApplicationVerificationException("RECAPTCHA_FAILED_TOKEN_NULL"));
+          }
+        })
+        .addOnFailureListener(taskError ->
+          onError.runWithData(new ApplicationVerificationException("RECAPTCHA_FAILED_TASK_EXCEPTION_" + ApplicationVerificationException.formatReCaptchaMessage(taskError), taskError))
+        );
+    };
+    RecaptchaProviderRegistry.execute(recaptchaKeyId, actor, clientError ->
+      onError.runWithData(new ApplicationVerificationException("RECAPTCHA_FAILED_GETCLIENT_EXCEPTION_" + ApplicationVerificationException.formatReCaptchaMessage(clientError), clientError))
+    );
   }
 
   private TdApi.AgeVerificationParameters ageVerificationParameters;
@@ -8923,12 +9120,20 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
 
   @TdlibThread
   private void updateApplicationVerificationRequired (TdApi.UpdateApplicationVerificationRequired update) {
-    send(new TdApi.SetApplicationVerificationToken(update.verificationId, null), okHandler());
+    incrementJobReferenceCount();
+    Runnable after = this::decrementJobReferenceCount;
+    requestPlayIntegrity(update.verificationId, update.nonce, data ->
+      send(new TdApi.SetApplicationVerificationToken(update.verificationId, data), typedOkHandler(after))
+    );
   }
 
   @TdlibThread
   private void updateApplicationRecaptchaVerificationRequired (TdApi.UpdateApplicationRecaptchaVerificationRequired update) {
-    send(new TdApi.SetApplicationVerificationToken(update.verificationId, null), okHandler());
+    incrementJobReferenceCount();
+    Runnable after = this::decrementJobReferenceCount;
+    requestRecaptcha(update.verificationId, update.action, update.recaptchaKeyId, data ->
+      send(new TdApi.SetApplicationVerificationToken(update.verificationId, data), typedOkHandler(after))
+    );
   }
 
   @TdlibThread
@@ -10428,6 +10633,69 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
         }
       }
     });
+  }
+
+  public static final class UpdateFileInfo {
+    public final TdApi.Document document;
+    public final int buildNo;
+    public final String version, commit;
+
+    public UpdateFileInfo (TdApi.Document document, int buildNo, String version, String commit) {
+      this.document = document;
+      this.buildNo = buildNo;
+      this.version = version;
+      this.commit = commit;
+    }
+  }
+
+  public void findUpdateFile (@NonNull RunnableData<UpdateFileInfo> onDone) {
+    final String abiFlavor = U.getPreferredAbiFlavor();
+    if (abiFlavor == null) {
+      onDone.runWithData(null);
+      return;
+    }
+    final String hashtag;
+    if (!BuildConfig.LATEST_FLAVOR) {
+      hashtag = abiFlavor + StringUtils.ucfirst(BuildConfig.FLAVOR_SDK);
+    } else {
+      hashtag = abiFlavor;
+    }
+    final String query = "#apk " +
+      (Settings.instance().getNewSetting(Settings.SETTING_FLAG_DOWNLOAD_BETAS) ? "" : "#stable ") +
+      "#" + hashtag;
+    clientHolder().updates.findResource(message -> {
+      if (message != null && Td.isDocument(message.content)) {
+        TdApi.Document document = ((TdApi.MessageDocument) message.content).document;
+        TdApi.FormattedText caption = ((TdApi.MessageDocument) message.content).caption;
+        boolean ok = false;
+        int buildNo = 0;
+        String version = null;
+        String commit = null;
+        final String prefix = "Telegram-X-";
+        if (!StringUtils.isEmpty(document.fileName) && document.fileName.startsWith(prefix)) {
+          int i = document.fileName.indexOf('-', prefix.length());
+          version = document.fileName.substring(prefix.length(), i == -1 ? document.fileName.length() : i);
+          if (version.matches("^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$")) {
+            buildNo = StringUtils.parseInt(version.substring(version.lastIndexOf('.') + 1));
+            if (buildNo > BuildConfig.ORIGINAL_VERSION_CODE) {
+              ok = true;
+            }
+          }
+        }
+        //noinspection UnsafeOptInUsageError
+        if (!Td.isEmpty(caption)) {
+          Pattern pattern = Pattern.compile("(?<=Commit:)\\s*([a-zA-Z0-9]+)", Pattern.CASE_INSENSITIVE);
+          Matcher matcher = pattern.matcher(caption.text);
+          if (matcher.find()) {
+            commit = matcher.group(1);
+            if (StringUtils.isEmpty(commit)) {
+              commit = null;
+            }
+          }
+        }
+        onDone.runWithData(ok ? new UpdateFileInfo(document, buildNo, version, commit) : null);
+      }
+    }, query, BuildConfig.COMMIT_DATE);
   }
 
   public <T extends Settings.CloudSetting> void fetchCloudSettings (@NonNull RunnableData<List<T>> callback, String requiredHashtag, @NonNull Future<T> currentSettingProvider, @NonNull Future<T> builtinItemProvider, @NonNull WrapperProvider<T, TdApi.Message> instanceProvider) {

@@ -93,10 +93,10 @@ public class TdlibAccount implements Comparable<TdlibAccount>, TdlibProvider {
     }
   }
 
-  TdlibAccount (TdlibManager context, int id, RandomAccessFile r, int version) throws IOException {
+  TdlibAccount (TdlibManager context, int id, RandomAccessFile r, int version, boolean allowIntegrityChecks) throws IOException {
     this.context = context;
     this.id = id;
-    restore(r, version);
+    restore(r, version, allowIntegrityChecks);
   }
 
   void markAsUsed () {
@@ -125,7 +125,7 @@ public class TdlibAccount implements Comparable<TdlibAccount>, TdlibProvider {
     return Integer.compare(this.id, o.id);
   }
 
-  private void restore (RandomAccessFile r, int version) throws IOException {
+  private void restore (RandomAccessFile r, int version, boolean allowIntegrityChecks) throws IOException {
     if (version >= VERSION_3) {
       this.flags = r.readInt();
     } else {
@@ -134,7 +134,16 @@ public class TdlibAccount implements Comparable<TdlibAccount>, TdlibProvider {
     this.knownUserId      = version >= VERSION_2 ? r.readLong() : r.readInt();
     this.modificationTime = r.readLong();
     this.order            = r.readInt();
-    Log.i(Log.TAG_ACCOUNTS, "restored accountId:%d flags:%d userId:%d time:%d order:%d", id, flags, knownUserId, modificationTime, order);
+    boolean integrityCheckFailed = false;
+    if (allowIntegrityChecks) {
+      if (BitwiseUtils.hasFlag(flags, FLAG_SERVICE | FLAG_DEBUG) && !Settings.instance().allowSpecialTdlibInstanceMode(id)) {
+        int flags = BitwiseUtils.setFlag(this.flags, FLAG_SERVICE, false);
+        flags = BitwiseUtils.setFlag(flags, FLAG_DEBUG, false);
+        this.flags = flags;
+        integrityCheckFailed = true;
+      }
+    }
+    Log.i(Log.TAG_ACCOUNTS, "restored accountId:%d flags:%d userId:%d time:%d order:%d integrity_check_failed:%b", id, flags, knownUserId, modificationTime, order, integrityCheckFailed);
   }
 
   static final int SIZE_PER_ENTRY = 4 /*flags*/ + 8 /*knownUserId*/ + 8 /*modification_time*/ + 4 /*order*/;

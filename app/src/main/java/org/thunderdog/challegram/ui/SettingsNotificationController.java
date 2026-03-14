@@ -414,11 +414,11 @@ public class SettingsNotificationController extends RecyclerViewController<Setti
       case TdlibNotificationManager.Status.DISABLED_APP_SYNC:
         return R.string.TurnSyncOnApp;
       case TdlibNotificationManager.Status.PUSH_SERVICE_MISSING:
-        return R.string.NotificationsGuidePushUnavailable;
+        return R.string.InstallGooglePlayServices;
       case TdlibNotificationManager.Status.INTERNAL_ERROR:
         return R.string.ShareNotificationError;
       case TdlibNotificationManager.Status.PUSH_SERVICE_ERROR:
-        return R.string.PushErrorResolve;
+        return R.string.FirebaseErrorResolve;
       case TdlibNotificationManager.Status.MISSING_PERMISSION:
       case TdlibNotificationManager.Status.ACCOUNT_NOT_SELECTED:
       case TdlibNotificationManager.Status.BLOCKED_ALL:
@@ -450,10 +450,10 @@ public class SettingsNotificationController extends RecyclerViewController<Setti
         guideRes = R.string.NotificationsGuideSyncAppOff;
         break;
       case TdlibNotificationManager.Status.PUSH_SERVICE_MISSING:
-        guideRes = R.string.NotificationsGuidePushUnavailable;
+        guideRes = R.string.NotificationsGuideFirebaseUnavailable;
         break;
       case TdlibNotificationManager.Status.PUSH_SERVICE_ERROR:
-        return Lang.getMarkdownString(this, R.string.NotificationsGuidePushError, Lang.boldCreator(), tdlib.context().getTokenError());
+        return Lang.getMarkdownString(this, R.string.NotificationsGuideFirebaseError, Lang.boldCreator(), tdlib.context().getTokenError());
       case TdlibNotificationManager.Status.INTERNAL_ERROR: {
         @StringRes int
           specificChatRes = R.string.NotificationsGuideErrorChat,
@@ -973,6 +973,9 @@ public class SettingsNotificationController extends RecyclerViewController<Setti
           } else {
             view.setData(R.string.Default);
           }
+        } else if (itemId == R.id.btn_foregroundSync) {
+          boolean value = Settings.instance().getNewSetting(Settings.SETTING_FLAG_FOREGROUND_SERVICE_ENABLED);
+          view.getToggler().setRadioEnabled(value, isUpdate);
         } else if (itemId == R.id.btn_inApp_chatSounds) {
           view.getToggler().setRadioEnabled(tdlib.notifications().areInAppChatSoundsEnabled(), isUpdate);
         } else if (itemId == R.id.btn_customChat_pinnedMessages) {
@@ -1223,6 +1226,13 @@ public class SettingsNotificationController extends RecyclerViewController<Setti
         items.add(new ListItem(ListItem.TYPE_VALUED_SETTING, R.id.btn_notifications_snooze, R.drawable.baseline_bullhorn_24, R.string.Channels).setData(tdlib.notifications().scopeChannel()));
         items.add(new ListItem(ListItem.TYPE_SHADOW_BOTTOM));
 
+        if (!Config.FOREGROUND_SYNC_ALWAYS_ENABLED) {
+          items.add(new ListItem(ListItem.TYPE_SHADOW_TOP));
+          items.add(new ListItem(ListItem.TYPE_RADIO_SETTING, R.id.btn_foregroundSync, 0, R.string.ForegroundSync));
+          items.add(new ListItem(ListItem.TYPE_SHADOW_BOTTOM));
+          items.add(new ListItem(ListItem.TYPE_DESCRIPTION, 0, 0, Lang.getMarkdownString(this, R.string.ForegroundSyncDesc)));
+        }
+
         items.add(new ListItem(ListItem.TYPE_SHADOW_TOP));
         items.add(new ListItem(ListItem.TYPE_SETTING, R.id.btn_archiveSettings, 0, R.string.ArchiveSettings));
         items.add(new ListItem(ListItem.TYPE_SHADOW_BOTTOM));
@@ -1458,6 +1468,12 @@ public class SettingsNotificationController extends RecyclerViewController<Setti
     } else if (viewId == R.id.btn_customChat_preview) {
       tdlib.notifications().toggleShowPreview(customChatId);
       adapter.updateValuedSettingById(R.id.btn_customChat_preview);
+    } else if (viewId == R.id.btn_foregroundSync) {
+      boolean value = adapter.toggleView(v);
+      Settings.instance().setNewSetting(Settings.SETTING_FLAG_FOREGROUND_SERVICE_ENABLED, value);
+      context.tooltipManager().builder(v).icon(R.drawable.baseline_info_24)
+        .show(tdlib, Lang.getMarkdownString(this, value ? R.string.ForegroundSyncDescOn : R.string.ForegroundSyncDescOff))
+        .hideDelayed(true, 5, TimeUnit.SECONDS);
     } else if (viewId == R.id.btn_inApp_chatSounds) {
       tdlib.notifications().toggleInAppChatSoundsEnabled();
       adapter.updateValuedSettingById(R.id.btn_inApp_chatSounds);
@@ -1494,8 +1510,8 @@ public class SettingsNotificationController extends RecyclerViewController<Setti
         }
         case TdlibNotificationManager.Status.PUSH_SERVICE_ERROR: {
           showOptions(new Options.Builder()
-            .item(new OptionItem(R.id.btn_retry, Lang.getString(R.string.PushErrorResolveTryAgain), OptionColor.BLUE, R.drawable.baseline_sync_problem_24))
-            .item(new OptionItem(R.id.btn_share, Lang.getString(R.string.PushErrorResolveShareError), OptionColor.NORMAL, R.drawable.baseline_forward_24))
+            .item(new OptionItem(R.id.btn_retry, Lang.getString(R.string.FirebaseErrorResolveTryAgain), OptionColor.BLUE, R.drawable.baseline_sync_problem_24))
+            .item(new OptionItem(R.id.btn_share, Lang.getString(R.string.FirebaseErrorResolveShareError), OptionColor.NORMAL, R.drawable.baseline_forward_24))
             .build(), (optionView, optionId) -> {
             if (optionId == R.id.btn_retry) {
               tdlib.context().checkDeviceToken(0, null);
@@ -1507,6 +1523,7 @@ public class SettingsNotificationController extends RecyclerViewController<Setti
           break;
         }
         case TdlibNotificationManager.Status.PUSH_SERVICE_MISSING: {
+          Intents.openLink("https://play.google.com/store/apps/details?id=com.google.android.gms");
           break;
         }
         default: {

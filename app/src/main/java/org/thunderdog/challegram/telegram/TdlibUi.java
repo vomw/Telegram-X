@@ -105,6 +105,7 @@ import org.thunderdog.challegram.ui.InstantViewController;
 import org.thunderdog.challegram.ui.ListItem;
 import org.thunderdog.challegram.ui.MainController;
 import org.thunderdog.challegram.ui.MapController;
+import org.thunderdog.challegram.ui.MapControllerFactory;
 import org.thunderdog.challegram.ui.MessagesController;
 import org.thunderdog.challegram.ui.PasscodeController;
 import org.thunderdog.challegram.ui.PasscodeSetupController;
@@ -4124,7 +4125,13 @@ public class TdlibUi extends Handler {
   // Map
 
   public boolean openMap (TdlibDelegate context, MapController.Args args) {
-    return Intents.openMap(args.latitude, args.longitude, args.title, args.address);
+    if (!U.isGooglePlayServicesAvailable(context.context())) {
+      return Intents.openMap(args.latitude, args.longitude, args.title, args.address);
+    }
+    MapController<?,?> c = MapControllerFactory.newMapController(context.context(), context.tdlib());
+    c.setArguments(args);
+    context.context().navigation().navigateTo(c);
+    return true;
   }
 
   // Proxy
@@ -4211,6 +4218,7 @@ public class TdlibUi extends Handler {
         /*case R.id.btn_proxyTor: {
           if (needInstallTor) {
             UI.showToast(R.string.ProxyTorUnavailable, Toast.LENGTH_SHORT);
+            Intents.openGooglePlay(U.PACKAGE_TOR);
             return false;
           } else {
             Settings.instance().addOrUpdateProxy(new TdApi.ProxySocks5("127.0.0.1", 9050, null, null), "Tor network", false);
@@ -5501,10 +5509,12 @@ public class TdlibUi extends Handler {
     int type = Settings.instance().getMapProviderType(mode == MAP_PROVIDER_MODE_CLOUD);
     if (mode == MAP_PROVIDER_MODE_CLOUD)  {
       b.setRawItems(new ListItem[] {
+        // new SettingItem(SettingItem.TYPE_RADIO_OPTION, R.id.btn_mapProviderGoogle, 0, R.string.MapPreviewProviderGoogle, R.id.btn_mapProvider, type == Settings.MAP_PROVIDER_GOOGLE),
         new ListItem(ListItem.TYPE_RADIO_OPTION, R.id.btn_mapProviderTelegram, 0, R.string.MapPreviewProviderTelegram, R.id.btn_mapProvider, type == Settings.MAP_PROVIDER_TELEGRAM),
       });
     } else {
       b.setRawItems(new ListItem[] {
+        // new SettingItem(SettingItem.TYPE_RADIO_OPTION, R.id.btn_mapProviderGoogle, 0, R.string.MapPreviewProviderGoogle, R.id.btn_mapProvider, type == Settings.MAP_PROVIDER_GOOGLE),
         new ListItem(ListItem.TYPE_RADIO_OPTION, R.id.btn_mapProviderTelegram, 0, R.string.MapPreviewProviderTelegram, R.id.btn_mapProvider, type == Settings.MAP_PROVIDER_TELEGRAM || (type == Settings.MAP_PROVIDER_UNSET && mode == MAP_PROVIDER_MODE_SECRET_TUTORIAL)),
         new ListItem(ListItem.TYPE_RADIO_OPTION, R.id.btn_mapProviderNone, 0, R.string.MapPreviewProviderNone, R.id.btn_mapProvider, type == Settings.MAP_PROVIDER_NONE),
       });
@@ -5512,7 +5522,9 @@ public class TdlibUi extends Handler {
     SettingsWrap wrap = c.showSettings(b.setSaveStr(R.string.Save).setIntDelegate((id, result) -> {
       int resultType;
       @IdRes int resultId = result.get(R.id.btn_mapProvider);
-      if (resultId == R.id.btn_mapProviderTelegram) {
+      if (resultId == R.id.btn_mapProviderGoogle) {
+        resultType = Settings.MAP_PROVIDER_GOOGLE;
+      } else if (resultId == R.id.btn_mapProviderTelegram) {
         resultType = Settings.MAP_PROVIDER_TELEGRAM;
       } else if (resultId == R.id.btn_mapProviderNone) {
         resultType = Settings.MAP_PROVIDER_NONE;

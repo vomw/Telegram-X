@@ -132,6 +132,7 @@ import org.thunderdog.challegram.unsorted.AppState;
 import org.thunderdog.challegram.unsorted.Passcode;
 import org.thunderdog.challegram.unsorted.Settings;
 import org.thunderdog.challegram.util.ActivityPermissionResult;
+import org.thunderdog.challegram.util.AppUpdater;
 import org.thunderdog.challegram.util.KonfettiBuilder;
 import org.thunderdog.challegram.util.Permissions;
 import org.thunderdog.challegram.widget.BaseRootLayout;
@@ -162,6 +163,7 @@ import me.vkryl.core.lambda.RunnableData;
 import me.vkryl.core.reference.ReferenceList;
 import me.vkryl.core.reference.ReferenceUtils;
 import nl.dionsegijn.konfetti.xml.KonfettiView;
+import tgx.app.RecaptchaProviderRegistry;
 
 @SuppressWarnings("deprecation")
 public abstract class BaseActivity extends FragmentActivity implements View.OnTouchListener, FactorAnimator.Target, Keyboard.OnStateChangeListener, ThemeChangeListener, SensorEventListener, TGPlayerController.TrackChangeListener, TGLegacyManager.EmojiLoadListener, Lang.Listener, Handler.Callback {
@@ -194,6 +196,10 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
 
   public RecordAudioVideoController getRecordAudioVideoController () {
     return recordAudioVideoController;
+  }
+
+  public AppUpdater appUpdater () {
+    return appUpdater;
   }
 
   public NavigationController navigation () {
@@ -318,6 +324,7 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
 
   private RoundVideoController roundVideoController;
   private RecordAudioVideoController recordAudioVideoController;
+  private AppUpdater appUpdater;
 
   protected Tdlib tdlib;
 
@@ -348,6 +355,7 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
         drawer.onCurrentTdlibChanged(tdlib);
       }
       onTdlibChanged();
+      runEmulatorChecks();
     }
   }
 
@@ -392,7 +400,7 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
         () -> !tdlib.context().hasActiveAccounts() || tdlib.isUnauthorized(),
         () -> {
           if (previousResult != null) {
-            if (false) {
+            if (previousResult.isEmulatorDetected()) {
               return false;
             }
             long elapsed = System.currentTimeMillis() - previousResult.time;
@@ -421,17 +429,24 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
     addEmulatorChecksCallback(after);
 
     // Impl
-    UI.post(() -> {
-      emulatorChecksFinished = true;
-      Settings.EmulatorDetectionResult result = new Settings.EmulatorDetectionResult();
-      if (activityState != UI.State.DESTROYED) {
-        for (int i = emulatorCheckFinishCallbacks.size() - 1; i >= 0; i--) {
-          RunnableData<Settings.EmulatorDetectionResult> act = emulatorCheckFinishCallbacks.remove(i);
-          act.runWithData(result);
+    new Thread(() -> {
+      long ms = SystemClock.uptimeMillis();
+      long detectionResult = DeviceUtils.detectEmulator(BaseActivity.this, BuildConfig.EXPERIMENTAL);
+      long elapsed = SystemClock.uptimeMillis() - ms;
+      Log.v("Ran emulator detections in %dms", elapsed);
+      Settings.EmulatorDetectionResult result = Settings.instance().trackEmulatorDetectionResult(installationId, elapsed, detectionResult);
+      tdlib.context().setIsEmulator(result.isEmulatorDetected());
+      UI.post(() -> {
+        emulatorChecksFinished = true;
+        if (activityState != UI.State.DESTROYED) {
+          for (int i = emulatorCheckFinishCallbacks.size() - 1; i >= 0; i--) {
+            RunnableData<Settings.EmulatorDetectionResult> act = emulatorCheckFinishCallbacks.remove(i);
+            act.runWithData(result);
+          }
         }
-      }
-      emulatorCheckFinishCallbacks.clear();
-    });
+        emulatorCheckFinishCallbacks.clear();
+      });
+    }, "EmulatorDetector").start();
   }
 
   protected void onTdlibChanged () {
@@ -456,6 +471,9 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
     AppState.initApplication();
     AppState.ensureReady();
 
+    RecaptchaProviderRegistry.setApplication(this.getApplication());
+
+    appUpdater = new AppUpdater(this);
     roundVideoController = new RoundVideoController(this);
     recordAudioVideoController = new RecordAudioVideoController(this);
     invalidator = new Invalidator(this);
@@ -1150,6 +1168,13 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
     Settings.instance().checkNightModeScheduler(true);
 
     /*if (DISALLOW_ON_PAUSE) {
+      if (allowCaptureOnResume) {
+        allowCaptureOnResume = false;
+        getWindow().setFlags(0, WindowManager.LayoutParams.FLAG_SECURE);
+      }
+    }*/
+    appUpdater.checkForUpdates();
+    runEmulatorChecks();
   }
 
   protected void setOnline (boolean isOnline) {
@@ -2360,6 +2385,10 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
   protected void onActivityResult (int requestCode, int resultCode, Intent data) {
     // TODO rework to registerForActivityResult
     super.onActivityResult(requestCode, resultCode, data);
+    if (requestCode == Intents.ACTIVITY_RESULT_GOOGLE_PLAY_UPDATE) {
+      appUpdater.onGooglePlayFlowActivityResult(resultCode, data);
+      return;
+    }
     final int handlerIndex = activityResultHandlers.indexOfKey(requestCode);
     if (handlerIndex >= 0) {
       ActivityResultHandler handler = activityResultHandlers.valueAt(handlerIndex);
@@ -2810,6 +2839,10 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
   }
 
   public final void checkDisallowScreenshots () {
+    if (UI.TEST_MODE == UI.TEST_MODE_AUTO) {
+      // Allow screen capture in Firebase Labs
+      return;
+    }
     boolean disallowScreenshots = false;
     disallowScreenshots = (navigation.shouldDisallowScreenshots() || Passcode.instance().shouldDisallowScreenshots());
     if (tdlib != null && tdlib.messageViewer().needRestrictScreenshots()) {

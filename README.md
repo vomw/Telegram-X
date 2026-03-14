@@ -1,17 +1,17 @@
-# [Telegram X](https://telegram.org) — a slick experimental Telegram client based on [TDLib](https://core.telegram.org/tdlib).
+# [Telegram X](https://play.google.com/store/apps/details?id=org.thunderdog.challegram) — a slick experimental Telegram client based on [TDLib](https://core.telegram.org/tdlib).
 
 ![Telegram X](/images/feature.png)
 
 This is the complete source code and the build instructions for the official alternative Android client for the Telegram messenger, based on the [Telegram API](https://core.telegram.org/api) and the [MTProto](https://core.telegram.org/mtproto) secure protocol via [TDLib](https://github.com/TGX-Android/tdlib).
 
-* [**Telegram X** updates channel](https://t.me/tgx_log)
+* [**Telegram X** on Google Play](http://play.google.com/store/apps/details?id=org.thunderdog.challegram) ([subscribe to beta](https://play.google.com/apps/testing/org.thunderdog.challegram))
 * [APKs and Build Info](https://t.me/tgx_log)
 * [Bot to verify APK hash](https://t.me/tgx_bot)
 
 <details>
 <summary>Other sources</summary>
 
-
+* [**Telegram X** on Huawei AppGallery](https://appgallery.huawei.com/app/C101754199)
 * [**GitHub Releases**](https://github.com/TGX-Android/Telegram-X/releases)
 
 </details>
@@ -45,7 +45,8 @@ This is the complete source code and the build instructions for the official alt
 3. Create `keystore.properties` file outside of source tree with the following properties:<br/>`keystore.file`: absolute path to the keystore file<br/>`keystore.password`: password for the keystore<br/>`key.alias`: key alias that will be used to sign the app<br/>`key.password`: key password.<br/>**Warning**: keep this file safe and make sure nobody, except you, has access to it. For production builds one could use a separate user with home folder encryption to avoid harm from physical theft
 4. `$ cd tgx`
 5. Run `$ scripts/./setup.sh` and follow up the instructions
-6. Now you can open the project using **[Android Studio](https://developer.android.com/studio/)** or build manually from the command line: `./gradlew assembleUniversalRelease`.
+6. If you specified package name that's different from the one Telegram X uses, [setup Firebase](https://firebase.google.com/docs/android/setup) and replace `google-services.json` with the one that's suitable for the `app.id` you need
+7. Now you can open the project using **[Android Studio](https://developer.android.com/studio/)** or build manually from the command line: `./gradlew assembleUniversalRelease`.
 
 #### Available flavors
 

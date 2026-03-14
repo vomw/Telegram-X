@@ -28,8 +28,8 @@ public class Device {
   public static final int AMAZON = 0x03;
   public static final int ASUS = 0x04;
   public static final int HTC = 0x05;
-  public static final int LG = 0x06;
-  public static final int HONOR = 0x07;
+  public static final int HUAWEI = 0x06;
+  public static final int LG = 0x07;
   public static final int MOTOROLA = 0x08;
   public static final int NVIDIA = 0x09;
   public static final int SONY = 0x10;
@@ -71,8 +71,10 @@ public class Device {
         return ASUS;
       case "lge":
         return LG;
-      case "honor":
-        return HONOR;
+      case "huawei":
+        return HUAWEI;
+      case "htc":
+        return HTC;
       case "motorola":
         return MOTOROLA;
       case "sony":
@@ -134,6 +136,8 @@ public class Device {
         }
         break;
       case HTC:
+        break;
+      case HUAWEI:
         break;
       case LG:
         break;

@@ -93,6 +93,49 @@ import tgx.td.Td;
 public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
   // Util
 
+  public static final int SYNC_CAUSE_WORK_MANAGER = 0;
+  public static final int SYNC_CAUSE_BOOT = 1;
+  public static final int SYNC_CAUSE_SYSTEM_SYNC = 2;
+  public static final int SYNC_CAUSE_DELETED_MESSAGES = 3;
+
+  public static boolean makeSync (Context context, int accountId, int cause, long causePushId, boolean sync, long timeout) {
+    final long ms = SystemClock.uptimeMillis();
+    UI.initApp(context);
+    final long taskId = causePushId == 0 ? Settings.instance().newPushId() : causePushId;
+    final AtomicBoolean success = sync ? new AtomicBoolean(false) : null;
+    final CountDownLatch latch = sync ? new CountDownLatch(1) : null;
+    if (accountId == TdlibAccount.NO_ID) {
+      TDLib.Tag.notifications(taskId, accountId, "Performing sync for all accounts, cause: %d, synchronized: %b, timeout: %d, initialized in: %d", cause, sync, timeout, SystemClock.uptimeMillis() - ms);
+    } else {
+      TDLib.Tag.notifications(taskId, accountId, "Performing sync for account, cause: %d, synchronized: %b, timeout: %d, initialized in: %d", cause, sync, timeout, SystemClock.uptimeMillis() - ms);
+    }
+    TdlibManager.instanceForAccountId(accountId).sync(taskId, accountId, () -> {
+      if (sync) {
+        synchronized (success) {
+          success.set(true);
+          latch.countDown();
+        }
+      }
+      TDLib.Tag.notifications(taskId, accountId, "Finished sync in %dms", SystemClock.uptimeMillis() - ms);
+    }, true, true, Config.MAX_RUNNING_TDLIBS, null);
+    if (sync) {
+      try {
+        if (timeout > 0) {
+          latch.await(timeout, TimeUnit.MILLISECONDS);
+        } else {
+          latch.await();
+        }
+      } catch (InterruptedException e) {
+        TDLib.Tag.notifications(taskId, accountId, "Sync was interrupted, elapsed: %dms", SystemClock.uptimeMillis() - ms);
+      }
+      synchronized (success) {
+        return success.get();
+      }
+    } else {
+      return true;
+    }
+  }
+
   @Retention(RetentionPolicy.SOURCE)
   @IntDef({
     ExternalAction.MARK_AS_HIDDEN,
@@ -329,6 +372,7 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
     onUiStateChanged(UI.getUiState());
 
     checkDeviceToken();
+    saveCrashes();
   }
 
   public DateManager dateManager () {
@@ -492,9 +536,28 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
     }
   }
 
+  // Emulator
+
+  private boolean isEmulator;
+
+  public void setIsEmulator (boolean isEmulator) {
+    if (this.isEmulator != isEmulator) {
+      this.isEmulator = isEmulator;
+      for (TdlibAccount account : accounts) {
+        Tdlib tdlib = account.tdlib;
+        if (tdlib != null) {
+          tdlib.setIsEmulator(isEmulator);
+        }
+      }
+    }
+  }
+
   // Client modification
 
   void modifyClient (Tdlib tdlib, Client client) {
+    if (isEmulator) {
+      client.send(new TdApi.SetOption("is_emulator", new TdApi.OptionValueBoolean(true)), tdlib.okHandler());
+    }
     if (networkType != null) {
       client.send(new TdApi.SetNetworkType(networkType), tdlib.okHandler());
     } else if (Settings.instance().forceDisableNetwork()) {
@@ -750,6 +813,156 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
     return -1;
   }
 
+  // Proxy
+
+  /*private void readProxyConfig (boolean debug) {
+    this.proxy = null;
+    this.migratingProxy = false;
+
+    File file = getProxyConfigFile(debug);
+    if (!file.exists()) {
+      File tdlibDir = new File(getTdlibDirectory(debug, 0, false));
+      if (tdlibDir.exists()) {
+        migratingProxy = true;
+        final boolean wasDebug = isDebug;
+        account(0).tdlib().client().send(new TdApi.GetProxy(), new Client.ResultHandler() {
+          @Override
+          public void onResult (TdApi.Object object) {
+            if (object.getConstructor() == TdApi.Error.CONSTRUCTOR) {
+              Log.e("Proxy get error: %s", TD.getErrorString(object));
+              return;
+            }
+            final TdApi.Proxy proxy = (TdApi.Proxy) object;
+            UI.post(new Runnable() {
+              @Override
+              public void run () {
+                if (isDebug == wasDebug) {
+                  migrateProxy(proxy);
+                }
+              }
+            });
+          }
+        });
+      } else {
+        U.createNewFile(file);
+      }
+      return;
+    }
+    if (file.length() == 0) {
+      this.proxy = new TdApi.ProxyEmpty();
+      global.notifyProxyChanged(proxy);
+      return;
+    }
+    RandomAccessFile r = null;
+    try {
+      r = new RandomAccessFile(file, MODE_R);
+      this.proxy = readProxy(r);
+    } catch (IOException e) {
+      Log.e(e);
+    }
+    U.close(r);
+    if (proxy != null) {
+      global.notifyProxyChanged(proxy);
+      return;
+    }
+    final boolean wasDebug = isDebug;
+    account(0).tdlib().client().send(new TdApi.GetProxy(), new Client.ResultHandler() {
+      @Override
+      public void onResult (final TdApi.Object object) {
+        if (object.getConstructor() == TdApi.Error.CONSTRUCTOR) {
+          Log.e("Proxy get error: %d", TD.getErrorString(object));
+          return;
+        }
+        UI.post(new Runnable() {
+          @Override
+          public void run () {
+            if (isDebug == wasDebug) {
+              proxy = ((TdApi.Proxy) object);
+              global.notifyProxyChanged(proxy);
+            }
+          }
+        });
+      }
+    });
+  }*/
+
+  /*private void migrateProxy (TdApi.Proxy proxy) {
+    if (this.migratingProxy) {
+      this.migratingProxy = false;
+      setProxy(proxy, 0);
+    }
+  }*/
+
+  /*public TdApi.Proxy proxy () {
+    return proxy;
+  }*/
+
+  /*private void saveProxyConfig () {
+    if (proxy == null) {
+      return;
+    }
+    RandomAccessFile r = null;
+    try {
+      File file = getProxyConfigFile(isDebug);
+      if (!file.exists() && !file.createNewFile()) {
+        return;
+      }
+      r = new RandomAccessFile(file, MODE_RW);
+      switch (proxy.getConstructor()) {
+        case TdApi.ProxyEmpty.CONSTRUCTOR:
+          r.setLength(0);
+          break;
+        case TdApi.ProxySocks5.CONSTRUCTOR: {
+          TdApi.ProxySocks5 proxy = (TdApi.ProxySocks5) this.proxy;
+          final int constructor = proxy.getConstructor();
+
+          Blob blob = new Blob(Blob.sizeOf(constructor) + Blob.sizeOf(proxy.server, true) + Blob.sizeOf(proxy.port) + 2 + Blob.sizeOf(proxy.username, false) + Blob.sizeOf(proxy.password, false));
+          blob.writeVarint(constructor);
+          blob.writeString(proxy.server);
+          blob.writeVarint(proxy.port);
+          boolean hasUsername = !Strings.isEmpty(proxy.username);
+          boolean hasPassword = !Strings.isEmpty(proxy.password);
+          int flags = 0;
+          if (hasUsername) flags |= 1;
+          if (hasPassword) flags |= 2;
+          blob.writeByte((byte) (flags));
+          if (hasUsername)
+            blob.writeString(proxy.username);
+          if (hasPassword)
+            blob.writeString(proxy.password);
+          byte[] result = blob.toByteArray();
+          r.setLength(result.length);
+          r.write(result);
+          break;
+        }
+      }
+    } catch (IOException e) {
+      Log.e(e);
+    }
+    U.close(r);
+  }*/
+
+  /*private void dispatchProxyConfig (int excludeAccountId) {
+    if (accounts.isEmpty()) {
+      return;
+    }
+    for (TdlibAccount account : this) {
+      if (account.tdlib != null && account.id != excludeAccountId) {
+        account.tdlib.client().send(new TdApi.SetProxy(proxy), account.tdlib.okHandler());
+      }
+    }
+  }
+
+  public void setProxy (TdApi.Proxy proxy, int excludeAccountId) {
+    if (proxy == null) {
+      return;
+    }
+    this.proxy = proxy;
+    saveProxyConfig();
+    dispatchProxyConfig(excludeAccountId);
+    global.notifyProxyChanged(proxy);
+  }*/
+
   // Account list
 
   private static final int BINLOG_PREFIX_SIZE = 4 /*account_num*/ + 4 /*preferred_id*/;
@@ -787,7 +1000,7 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
     AccountConfig config = null;
     if (file.exists()) {
       try (RandomAccessFile r = new RandomAccessFile(file, MODE_R)) {
-        config = readAccountConfig(this, r, TdlibAccount.VERSION);
+        config = readAccountConfig(this, r, TdlibAccount.VERSION, true);
       } catch (IOException e) {
         Log.e(e);
       }
@@ -837,7 +1050,7 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
     }
   }
 
-  public static AccountConfig readAccountConfig (@Nullable TdlibManager context, RandomAccessFile r, int version) throws IOException {
+  public static AccountConfig readAccountConfig (@Nullable TdlibManager context, RandomAccessFile r, int version, boolean allowIntegrityChecks) throws IOException {
     long ms = SystemClock.uptimeMillis();
 
     long binlogSize = r.length();
@@ -853,7 +1066,7 @@ public class TdlibManager implements Iterable<TdlibAccount>, UI.StateListener {
     final int preferredAccountId = r.readInt();
     final List<TdlibAccount> accounts = new ArrayList<>(accountNum);
     for (int accountId = 0; accountId < accountNum; accountId++) {
-      TdlibAccount account = new TdlibAccount(context, accountId, r, version);
+      TdlibAccount account = new TdlibAccount(context, accountId, r, version, allowIntegrityChecks);
       if (!account.isUnauthorized()) {
         if (accountId == preferredAccountId || currentAccount == null || currentAccount.id < preferredAccountId) {
           currentAccount = account;

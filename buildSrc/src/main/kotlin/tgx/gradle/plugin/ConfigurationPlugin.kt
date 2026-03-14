@@ -49,15 +49,30 @@ open class ConfigurationPlugin : Plugin<Project> {
     } else {
       null
     }
+    val safetyNetToken = if (keystore != null) {
+      properties.getProperty("safetynet.api_key", "")
+    } else {
+      null
+    }
     fun getOrSample (key: String): String {
       return properties.getProperty(key, null) ?: sampleProperties.getOrThrow(key)
     }
     val applicationId = getOrSample("app.id")
     val applicationName = getOrSample("app.name")
+    val appDownloadUrl = getOrSample("app.download_url")
+    val googlePlayUrl = properties.getProperty("app.google_download_url", null)
+    val galaxyStoreUrl = properties.getProperty("app.galaxy_download_url", null)
+    val huaweiAppGalleryUrl = properties.getProperty("app.huawei_download_url", null)
+    val amazonAppStoreUrl = properties.getProperty("app.amazon_download_url", null)
     val isExampleBuild = applicationId.startsWith("com.example.") || applicationId.startsWith("org.example.")
     val isExperimentalBuild = isExampleBuild || keystore == null || properties.getProperty("app.experimental", "false") == "true"
     val doNotObfuscate = isExampleBuild || properties.getProperty("app.dontobfuscate", "false") == "true"
     val forceOptimize = properties.getProperty("app.forceoptimize") == "true"
+    val appExtension = getOrSample("tgx.extension")
+    if (appExtension != "none" && appExtension != "hms") {
+      error("Unknown tgx.extension: $appExtension")
+    }
+    val isHuaweiBuild = appExtension == "hms"
 
     val versions = loadProperties("version.properties")
 
@@ -105,10 +120,12 @@ open class ConfigurationPlugin : Plugin<Project> {
     val config = ApplicationConfig(
       applicationName,
       applicationId,
+      appExtension,
       sourceCodeUrl,
       applicationVersion,
       majorVersion,
       isExperimentalBuild,
+      isHuaweiBuild,
       forceOptimize,
       doNotObfuscate,
       compileSdkVersion,
@@ -122,6 +139,12 @@ open class ConfigurationPlugin : Plugin<Project> {
 
       telegramApiId,
       telegramApiHash,
+      safetyNetToken,
+      appDownloadUrl,
+      googlePlayUrl,
+      galaxyStoreUrl,
+      huaweiAppGalleryUrl,
+      amazonAppStoreUrl,
 
       pullRequests,
 

@@ -58,6 +58,7 @@ import org.thunderdog.challegram.tool.UI;
 import org.thunderdog.challegram.ui.camera.CameraController;
 import org.thunderdog.challegram.unsorted.Settings;
 import org.thunderdog.challegram.unsorted.Test;
+import org.thunderdog.challegram.util.AppUpdater;
 import org.thunderdog.challegram.util.Crash;
 import org.thunderdog.challegram.util.StringList;
 import org.thunderdog.challegram.v.CustomRecyclerView;
@@ -395,7 +396,7 @@ public class SettingsBugController extends RecyclerViewController<SettingsBugCon
       default:
         return null;
     }
-    return Lang.getMarkdownStringSecure(this, resId, getDiskAvailableInfo(), "");
+    return Lang.getMarkdownStringSecure(this, resId, getDiskAvailableInfo(), AppUpdater.getDownloadUrl(null).url);
   }
 
   @Override
@@ -415,9 +416,17 @@ public class SettingsBugController extends RecyclerViewController<SettingsBugCon
       return "null";
     }
     switch (deviceToken.getConstructor()) {
+      case TdApi.DeviceTokenFirebaseCloudMessaging.CONSTRUCTOR: {
+        TdApi.DeviceTokenFirebaseCloudMessaging fcm = (TdApi.DeviceTokenFirebaseCloudMessaging) deviceToken;
+        return "Firebase: " + fcm.token + ", encrypt: " + fcm.encrypt;
+      }
+      case TdApi.DeviceTokenHuaweiPush.CONSTRUCTOR: {
+        TdApi.DeviceTokenHuaweiPush huaweiPush = (TdApi.DeviceTokenHuaweiPush) deviceToken;
+        return "Huawei: " + huaweiPush.token + ", encrypt: " + huaweiPush.encrypt;
+      }
       case TdApi.DeviceTokenSimplePush.CONSTRUCTOR: {
-        TdApi.DeviceTokenSimplePush sp = (TdApi.DeviceTokenSimplePush) deviceToken;
-        return "SimplePush: " + sp.endpoint;
+        TdApi.DeviceTokenSimplePush simplePush = (TdApi.DeviceTokenSimplePush) deviceToken;
+        return "Simple Push: " + simplePush.endpoint;
       }
       default: {
         Td.assertDeviceToken_de4a4f61();
@@ -1411,6 +1420,11 @@ public class SettingsBugController extends RecyclerViewController<SettingsBugCon
     } else if (viewId == R.id.btn_secret_resetLocalNotificationSettings) {
       tdlib.notifications().resetNotificationSettings(true);
     } else if (viewId == R.id.btn_secret_attest) {
+      tdlib.requestPlayIntegrity(-1, StringUtils.random("0123456789abcdef", 32), (data) -> {
+        runOnUiThread(() -> {
+          openAlert(R.string.AppName, data);
+        });
+      });
     } else if (viewId == R.id.btn_secret_databaseStats) {
       String stats = Settings.instance().pmc().getProperty("leveldb.stats") + "\n\n" + "Memory usage: " + Settings.instance().pmc().getProperty("leveldb.approximate-memory-usage");
       TextController c = new TextController(context, tdlib);

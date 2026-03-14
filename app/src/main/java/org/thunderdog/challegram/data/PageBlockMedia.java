@@ -101,6 +101,12 @@ public class PageBlockMedia extends PageBlock implements MediaWrapper.OnClickLis
     this.map = map;
     setCaption(map.caption);
     switch (Settings.instance().getMapProviderType(true)) {
+      case Settings.MAP_PROVIDER_GOOGLE: {
+        String url = U.getMapPreview(context.tdlib(), map.location.latitude, map.location.longitude, map.zoom, false, map.width, map.height, null);
+        this.mapFile = new ImageFileRemote(context.tdlib(), url, new TdApi.FileTypeThumbnail());
+        this.mapFile.setScaleType(ImageFile.CENTER_CROP);
+        break;
+      }
       case Settings.MAP_PROVIDER_TELEGRAM:
       default: {
         int w = map.width;

@@ -166,6 +166,7 @@ public class AudioController extends BasePlaybackController implements TGAudio.P
       }
       if (mode == PLAYBACK_MODE_EXOPLAYER_LIST) {
         serviceLaunchCancellationSignal = new CancellationSignal();
+        UI.startService(new Intent(UI.getAppContext(), AudioService.class), needForeground, false, serviceLaunchCancellationSignal);
       }
     }
   }

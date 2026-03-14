@@ -570,6 +570,8 @@ data class TdlibOptions(
 
   private fun set (name: String, value: JsonValue) {
     when (name) {
+      "force_inapp_update" ->
+        forceInAppUpdate = value.boolValue()
       "youtube_pip" ->
         youtubePipDisabled = value.stringValue() == "disabled"
 

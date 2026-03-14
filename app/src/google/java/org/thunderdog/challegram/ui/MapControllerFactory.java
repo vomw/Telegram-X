@@ -9,15 +9,17 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * File created on 22/10/2022
  */
 package org.thunderdog.challegram.ui;
 
 import android.content.Context;
+
 import org.thunderdog.challegram.telegram.Tdlib;
 
 public final class MapControllerFactory {
   public static MapController<?,?> newMapController (Context context, Tdlib tdlib) {
-    // Neutralized: Google services removed.
-    return null;
+    return new MapGoogleController(context, tdlib);
   }
 }

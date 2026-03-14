@@ -244,6 +244,14 @@ public class Permissions {
     return requestPermissions(after, Manifest.permission.READ_CONTACTS);
   }
 
+  public boolean requestForegroundService (@NonNull RunnableBool after) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      return requestPermissions(after, Manifest.permission.FOREGROUND_SERVICE);
+    } else {
+      return false;
+    }
+  }
+
   public boolean canManageStorage () {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
       return

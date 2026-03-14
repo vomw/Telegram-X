@@ -21,9 +21,13 @@ import java.lang.annotation.RetentionPolicy;
 
 @Retention(RetentionPolicy.SOURCE)
 @IntDef({
+  DeviceTokenType.FIREBASE_CLOUD_MESSAGING,
+  DeviceTokenType.HUAWEI_PUSH_SERVICE,
   DeviceTokenType.SIMPLE_PUSH_SERVICE
 })
 public @interface DeviceTokenType {
   int
+    FIREBASE_CLOUD_MESSAGING = 0,
+    HUAWEI_PUSH_SERVICE = 1,
     SIMPLE_PUSH_SERVICE = 2;
 }

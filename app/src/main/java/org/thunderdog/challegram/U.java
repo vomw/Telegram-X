@@ -114,6 +114,9 @@ import androidx.media3.extractor.DefaultExtractorsFactory;
 import androidx.media3.extractor.ExtractorInput;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
+
 import org.drinkless.tdlib.TdApi;
 import org.thunderdog.challegram.config.Config;
 import org.thunderdog.challegram.config.Device;
@@ -498,8 +501,28 @@ public class U {
       if (StringUtils.isEmpty(notification.getChannelId()))
         throw new IllegalArgumentException("id == " + notificationId);
     }
-    // Background functionality is neutralized.
-    // service.startForeground(notificationId, notification);
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      switch (notificationId) {
+        case TdlibNotificationManager.ID_ONGOING_CALL_NOTIFICATION:
+        case TdlibNotificationManager.ID_INCOMING_CALL_NOTIFICATION: {
+          int knownType = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL;
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            knownType |= android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
+          }
+          knownType |= android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK;
+          service.startForeground(notificationId, notification, knownType);
+          return;
+        }
+        case TdlibNotificationManager.ID_MUSIC:
+        case TdlibNotificationManager.ID_LOCATION:
+        case TdlibNotificationManager.ID_PENDING_TASK:
+          // android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST;
+          break;
+        default:
+          throw new UnsupportedOperationException(Integer.toString(notificationId));
+      }
+    }
+    service.startForeground(notificationId, notification);
   }
 
   public static void stopForeground (Service service, boolean removeNotification, int... notificationIds) {
@@ -692,6 +715,19 @@ public class U {
     }
   }
 
+  public static boolean isGooglePlayServicesInstalled (Context context) {
+    PackageManager pm = context.getPackageManager();
+    boolean app_installed;
+    try {
+      PackageInfo info = pm.getPackageInfo("com.android.vending", PackageManager.GET_ACTIVITIES);
+      String label = (String) info.applicationInfo.loadLabel(pm);
+      app_installed = !StringUtils.isEmpty(label) && label.startsWith("Google Play");
+    } catch(PackageManager.NameNotFoundException e) {
+      app_installed = false;
+    }
+    return app_installed;
+  }
+
   public static ExoPlayer newExoPlayer (Context context, boolean preferExtensions) {
     // new AdaptiveVideoTrackSelection.Factory(new DefaultBandwidthMeter())
     // DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
@@ -841,6 +877,13 @@ public class U {
   }
 
   public static boolean isGooglePlayServicesAvailable (Context context) {
+    try {
+      if (context != null && Config.GCM_ENABLED) {
+        GoogleApiAvailability googleApiAvailability = GoogleApiAvailability.getInstance();
+        int resultCode = googleApiAvailability.isGooglePlayServicesAvailable(context);
+        return resultCode == ConnectionResult.SUCCESS;
+      }
+    } catch (Throwable ignored) { }
     return false;
   }
 
@@ -1013,6 +1056,36 @@ public class U {
     return b.toString();
   }
 
+  private static final String MAP_DARK_STYLE = "&style=element:geometry%7Ccolor:0x212121&style=element:labels.icon%7Cvisibility:off&style=element:labels.text.fill%7Ccolor:0x757575&style=element:labels.text.stroke%7Ccolor:0x212121&style=feature:administrative%7Celement:geometry%7Ccolor:0x757575&style=feature:administrative.country%7Celement:labels.text.fill%7Ccolor:0x9e9e9e&style=feature:administrative.land_parcel%7Cvisibility:off&style=feature:administrative.locality%7Celement:labels.text.fill%7Ccolor:0xbdbdbd&style=feature:poi%7Celement:labels.text.fill%7Ccolor:0x757575&style=feature:poi.park%7Celement:geometry%7Ccolor:0x181818&style=feature:poi.park%7Celement:labels.text.fill%7Ccolor:0x616161&style=feature:poi.park%7Celement:labels.text.stroke%7Ccolor:0x1b1b1b&style=feature:road%7Celement:geometry.fill%7Ccolor:0x2c2c2c&style=feature:road%7Celement:labels.text.fill%7Ccolor:0x8a8a8a&style=feature:road.arterial%7Celement:geometry%7Ccolor:0x373737&style=feature:road.highway%7Celement:geometry%7Ccolor:0x3c3c3c&style=feature:road.highway.controlled_access%7Celement:geometry%7Ccolor:0x4e4e4e&style=feature:road.local%7Celement:labels.text.fill%7Ccolor:0x616161&style=feature:transit%7Celement:labels.text.fill%7Ccolor:0x757575&style=feature:water%7Celement:geometry%7Ccolor:0x000000&style=feature:water%7Celement:labels.text.fill%7Ccolor:0x3d3d3d";
+
+  @SuppressWarnings(value = "SpellCheckingInspection")
+  public static String getMapPreview (Tdlib tdlib, double lat, double lon, int zoom, boolean dark, int viewWidth, int viewHeight, int[] resultSize) {
+    int scale = Screen.density() >= 2.0f ? 2 : 1;
+
+    int maxWidth = Math.min(viewWidth / scale, MAP_WIDTH);
+    int maxHeight = Math.min(viewHeight / scale, MAP_HEIGHT);
+
+    int width = MAP_WIDTH;
+    int height = MAP_HEIGHT;
+
+    float ratio = Math.min((float) maxWidth / (float) width, (float) maxHeight / (float) height);
+
+    width = (int) ((float) width * ratio);
+    height = (int) ((float) height * ratio);
+
+    width -= width % 2;
+    height -= height % 2;
+
+    String result = String.format(Locale.US, "https://maps.googleapis.com/maps/api/staticmap?format=jpg&center=%f,%f&zoom=%d&size=%dx%d&maptype=roadmap&scale=%d&sensor=false&language=%s%s", lat, lon, zoom, width, height, scale, tdlib.language(), dark ? MAP_DARK_STYLE : "");
+
+    if (resultSize != null) {
+      resultSize[0] = width * scale;
+      resultSize[1] = height * scale;
+    }
+
+    return result;
+  }
+
   public static long calculateDelayForDiameter (long diameter, long duration) {
     int distance = (int) ((double) (diameter) * Math.PI);
     return calculateDelayForDistance(distance, duration);
@@ -1024,6 +1097,21 @@ public class U {
       delay = (long) Math.ceil((double) delay * Screen.density());
     }
     return Math.max(ValueAnimator.getFrameDelay(), delay);
+  }
+
+  public static String getMapPreview (double lat, double lon, int zoom, boolean dark, int viewWidth, int viewHeight) {
+    int scale = Screen.density() >= 2.0f ? 2 : 1;
+
+    viewWidth /= scale;
+    viewHeight /= scale;
+
+    if (viewWidth > MAP_WIDTH || viewHeight > MAP_HEIGHT) {
+      float ratio = Math.min((float) MAP_WIDTH / (float) viewWidth, (float) MAP_HEIGHT / (float) viewHeight);
+      viewWidth = (int) ((float) viewWidth * ratio);
+      viewHeight = (int) ((float) viewHeight * ratio);
+    }
+
+    return String.format(Locale.US, "https://maps.googleapis.com/maps/api/staticmap?format=jpg&center=%f,%f&zoom=%d&size=%dx%d&maptype=roadmap&scale=%d&sensor=false%s", lat, lon, zoom, viewWidth, viewHeight, scale, dark ? MAP_DARK_STYLE : "");
   }
 
   public static boolean canStreamVideo (TdApi.InputFile inputFile) {
@@ -1067,6 +1155,7 @@ public class U {
     }
   }
 
+  public static final String PACKAGE_GOOGLE_MAPS = "com.google.android.apps.maps";
   public static final String PACKAGE_TOR = "org.torproject.android";
 
   public static final int MAP_WIDTH = 640;
@@ -1265,7 +1354,7 @@ public class U {
   }
 
   public static boolean isGoogleDriveDocument (Uri uri) {
-    return false;
+    return "com.google.android.apps.docs.storage".equals(uri.getAuthority());
   }
 
   public static String getFileTimestamp () {
@@ -2466,6 +2555,7 @@ public class U {
       "TDLib: " + Td.tdlibVersion() + " (tdlib/td@" + Td.tdlibCommitHash() + ")\n" +
       "androidx-media3: " + MediaLibraryInfo.VERSION + " [" + MediaLibraryInfo.registeredModules().replaceAll("(?<=^| )media3\\.", "") + "]\n" +
       "tgcalls: TGX-Android/tgcalls@" + BuildConfig.TGCALLS_COMMIT + "\n" +
+      "Recaptcha: " + BuildConfig.RECAPTCHA_VERSION + "\n" +
       "WebRTC: TGX-Android/webrtc@" + BuildConfig.WEBRTC_COMMIT + "\n" +
       "Android: " + SdkVersion.getPrettyName() + " (" + Build.VERSION.SDK_INT + ")" + "\n" +
       "Device: " + Build.MANUFACTURER + " " + Build.BRAND + " " + Build.MODEL + " (" + Build.DISPLAY + ")\n" +

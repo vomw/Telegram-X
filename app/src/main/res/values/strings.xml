@@ -912,7 +912,7 @@
   <string name="ShareYouLocationUnableManually">Choose manually</string>
   <string name="NoLocationAccess">This feature requires access to your location.</string>
   <string name="NoLocationAccessBackground">This feature requires access to your location while app is in background.</string>
-  <string name="NoGoogleMaps">This feature requires map services installed.</string>
+  <string name="NoGoogleMaps">This feature requires Google Maps installed.</string>
   <string name="NoStorageAccess">This feature requires storage access.</string>
   <string name="NoMicrophoneAccess">This feature requires access to microphone.</string>
   <string name="NoCameraAccess">This feature requires access to camera.</string>
@@ -2690,7 +2690,8 @@
   <string name="AutoInstantViewAll">All links</string>
   <string name="DeepLinkUnsupported">Unknown or broken link format</string>
   <string name="InternalUrlUnsupported">Sorry, this link type is not yet supported.</string>
-
+  <string name="AppUpdateRequiredTitle">Update required</string>
+  <string name="AppUpdateOk">Update</string>
   <string name="ProxySponsor">Proxy sponsor</string>
   <string name="message_viaBot">via %1$s</string>
   <string name="message_nameViaBot">%1$s via %2$s</string>
@@ -2913,7 +2914,7 @@
   <string name="MapPreviewProviderHint">Choose a provider to display map previews in Secret Chats.\n\nThis requires sending the selected provider an anonymous request with the received coordinates.</string>
   <string name="MapPreviewProviderNone">No Previews</string>
   <string name="MapPreviewProviderUnset">Unset</string>
-  <string name="MapPreviewProviderGoogle">Google</string>
+  <string name="MapPreviewProviderGoogle">Google Maps</string>
   <string name="MapPreviewProviderTelegram">Telegram</string>
   <string name="InvalidLocalisation">Invalid Localization File</string>
   <string name="LanguageInfo">Are you sure you want to apply this localization file?\n\nLanguage: %1$s (%2$s)\nLocale: %3$s, %4$s\nTranslated: %5$d%% (%6$s)</string>
@@ -3494,19 +3495,19 @@
   <string name="NotificationsGuidePermission">Notifications from Telegram are blocked in your system settings.\n\nTo enable notifications:\n• Go to system settings – Applications – Telegram X.\n• Tap Notifications – Allow notifications.</string>
   <string name="NotificationsGuideSyncGlobalOff">You have data sync turned off in system settings. Notifications may not arrive when app is closed.\n\nData sync may be implicitly turned off by the battery optimization mode on your device.</string>
   <string name="NotificationsGuideSyncAppOff">You have data sync turned off for Telegram X. Notifications may not arrive when app is closed.\n\nData sync may be implicitly turned off by the battery optimization mode on your device.</string>
-  <string name="NotificationsGuidePushUnavailable">Push services are unavailable.\n\nNotifications may arrive with delays or not arrive at all while the app is in background.</string>
-  <string name="NotificationsGuidePushError">**Push Services** have failed to function properly due to error: %1$s\n\nNotifications may arrive with delays or not arrive at all while the app is in background.</string>
+  <string name="NotificationsGuideFirebaseUnavailable">Google Play Services are unavailable. Please check you have them installed and up-to-date.\n\nNotifications may arrive with big delays or not arrive at all without them.</string>
+  <string name="NotificationsGuideFirebaseError">**Firebase Services** have failed to function properly due to error: %1$s\n\nNotifications may arrive with big delays or not arrive at all without them.\n\nPlease make sure:\n• Google Play Services are installed and up-to-date: https://support.google.com/googleplay/answer/9037938?hl=en\n• Telegram X is up-to-date\n• Firebase services are enabled\n• They are not blocked by your Internet service or DNS provider\n• If you have firewall or ad blocking software, Firebase domains are whitelisted\n• You can see 404 message in a browser on this page: https://firebaseinstallations.googleapis.com/\n• System date and time is correct\n• Problem doesn\'t go away after restarting your device\n• All system updates are installed\n• You are using the **official** version of Telegram X: @tgx_log\n\nIf the steps above do not help, try again with VPN that you trust, as it might be caused by Internet censorship applied by authorities in your region.</string>
   <string name="NotificationsGuideError">**Telegram X** was unable to display some notifications for this account due to an unknown system error.\n\nPlease make sure:\n• All system updates are installed\n• Telegram X is up-to-date\n• There are no notification restrictions in system settings.\n\nIf the steps above do not help, you might want to share the detailed error report to @tgandroidtests, or look up for troubleshooting tips for your device.</string>
   <string name="NotificationsGuideErrorChat">**Telegram X** was unable to display some notifications from %1$s due to an unknown system error.\n\nPlease make sure:\n• All system updates are installed\n• Telegram X is up-to-date\n• There are no notification restrictions in system settings.\n\nIf the steps above do not help, you might want to share the detailed error report to @tgandroidtests, or look up for troubleshooting tips for your device.</string>
   <string name="NotificationsGuideCategoryLimit">**Telegram X** was unable to display some notifications for this account due to notification categories system limit.\n\nPlease make sure:\n• All system updates are installed\n• Telegram X is up-to-date\n• There are no notification restrictions in system settings.\n\nIf the steps above do not help, you might want to ask @tgandroidtests for troubleshooting tips for your device, or re-install Telegram X, which should help resolving this error, but requires logging in to your account again.</string>
   <string name="NotificationsGuideCategoryLimitErrorChat">**Telegram X** was unable to display some notifications from %1$s due to notification categories system limit.\n\nPlease make sure:\n• All system updates are installed\n• Telegram X is up-to-date\n• There are no notification restrictions in system settings.\n\nIf the steps above do not help, you might want to ask @tgandroidtests for troubleshooting tips for your device, or re-install Telegram X, which should help resolving this error, but requires logging in to your account again.</string>
   <string name="TurnSyncOnApp">Turn on data sync</string>
   <string name="TurnSyncOnSystem">Turn on data sync</string>
-
+  <string name="InstallGooglePlayServices">Get Google Play Services</string>
   <string name="ShareNotificationError">Share Error Report</string>
-  <string name="PushErrorResolve">Tap to resolve issue</string>
-  <string name="PushErrorResolveTryAgain">Try again</string>
-  <string name="PushErrorResolveShareError">Share error details</string>
+  <string name="FirebaseErrorResolve">Tap to resolve issue</string>
+  <string name="FirebaseErrorResolveTryAgain">Try again</string>
+  <string name="FirebaseErrorResolveShareError">Share error details</string>
 
   <string name="LanguageSame">You are already using this language pack (**%1$s**). You can change your language at any time in Settings.</string>
   <string name="LanguageAlert">You are about to apply a language pack (**%1$s**) that is %2$d%% complete.\n\nThis will translate the entire interface. You can suggest corrections via the [translation platform](%3$s).\n\nYou can change your language back at any time in Settings.</string>
@@ -3797,7 +3798,9 @@
   <string name="ChatBannedUntil">Admins have banned you in this group until %1$s</string>
 
   <string name="UpgradeChatPrompt">To perform this action, this chat will be converted to supergroup.\n\n**Note**: new members will not see messages sent before the conversion.</string>
-
+  <string name="AppUpdateReady">Telegram X is ready to be updated.</string>
+  <string name="AppUpdateRestart">Restart</string>
+  <string name="AppUpdateInstall">Update</string>
 
   <string name="GroupLinkSet">Tap to set public group link</string>
   <string name="ChannelLinkSet">Tap to set public channel link</string>
@@ -4609,7 +4612,8 @@
   <string name="QualityBetter">Better quality</string>
   <string name="BiometricsError">System biometrics driver failure, see log for details.</string>
 
-
+  <string name="InAppUpdates">In-App Updates</string>
+  <string name="AppUpdates">App Updates</string>
   <string name="AutoUpdate">Update automatically</string>
   <string name="AutoUpdateNever">Never</string>
   <string name="AutoUpdateAlways">Always</string>
@@ -4622,7 +4626,8 @@
   <string name="DownloadUpdateSize">Download update (%1$s)</string>
   <string name="DownloadUpdate">Download update</string>
   <string name="UpdateSourceChanges">View source code changes</string>
-
+  <string name="AppUpdateAvailablePrompt">A new **Telegram X** update is available. Would you like to download? (%1$s)</string>
+  <string name="AppUpdateAvailableVersionPrompt">A new **Telegram X** `%2$s` update is available. Would you like to download? (%1$s)</string>
 
   <string name="AppSignature">**Telegram X** `%1$s`</string>
 
@@ -5334,7 +5339,7 @@
   <string name="Experiment_NoEdgeToEdgeInfo">Use this setting to compare behavior without edge-to-edge mode on Android 11–14.</string>
 
   <string name="Experiment_ForceAltPushService">Force alternative Push Services</string>
-  <string name="Experiment_ForceAltPushServiceInfo">Prefer alternative push services provider. Restart application manually to apply changes.</string>
+  <string name="Experiment_ForceAltPushServiceInfo">Prefer alternative push services provider, even if Google Play Services are installed and available. Restart application manually to apply changes.</string>
 
   <string name="PeerId">Peer ID</string>
   <string name="UserId">User ID</string>
@@ -5503,7 +5508,13 @@
   <string name="GiveawayInfoClose">Close</string>
   <string name="GiveawayViewMyPrize">View my prize</string>
 
-
+  <string name="EmulatorWarning">You are running **Telegram X** on an **emulated device**.\n\n**Note**: if you don\'t have an **existing** Telegram account, you may need a **real device** to create it.\n\nIn case you see this warning on a real device (such as phone, tablet, etc), press **report issue**.</string>
+  <string name="EmulatorWarningStrict">You are running **Telegram X** on an **emulated device**.\n\n**Note**: if you don\'t have an **existing** Telegram account, you may need a **real device** to create it.\n\nIf you have your phone connected to a PC, disconnect it and restart Telegram X.</string>
+  <string name="EmulatorWarningTitle">Emulator detected</string>
+  <string name="EmulatorWarningBtnReport">Report issue</string>
+  <string name="EmulatorWarningBtnOk">Got it</string>
+  <string name="EmulatorWarningReport">**Note**: you will need **GitHub account** to report this issue.\n\nAlternatively you can copy the link and send it to tgx-android@pm.me</string>
+  <string name="EmulatorWarningReportBtn">Report on GitHub</string>
 
   <string name="AddFolderAndJoinXChats_one">Add Folder and Join %1$s chat</string>
   <string name="AddFolderAndJoinXChats_other">Add Folder and Join %1$s chats</string>

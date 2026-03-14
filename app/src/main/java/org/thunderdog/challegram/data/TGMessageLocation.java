@@ -570,6 +570,12 @@ public class TGMessageLocation extends TGMessage implements LiveLocationManager.
         this.geoFile.setScaleType(ImageFile.CENTER_CROP);
         break;
       }
+      case Settings.MAP_PROVIDER_GOOGLE: {
+        String url = U.getMapPreview(tdlib, point.latitude, point.longitude, 16, false, previewWidth, previewHeight, null);
+        this.geoFile = new ImageFileRemote(tdlib, url, isSecretChat() ? new TdApi.FileTypeSecretThumbnail() : new TdApi.FileTypeThumbnail());
+        this.geoFile.setScaleType(ImageFile.CENTER_CROP);
+        break;
+      }
     }
 
 
@@ -930,23 +936,26 @@ public class TGMessageLocation extends TGMessage implements LiveLocationManager.
             }
             ViewUtils.onClick(view);
             if (isSecretChat()) {
-              double latitude = point.latitude;
-              double longitude = point.longitude;
-              controller().showOptions(latitudeStr(latitude) + " " + longitudeStr(longitude), new int[] {R.id.btn_open, R.id.btn_copyText, R.id.btn_openIn}, new String[] {Lang.getString(R.string.OpenMap), Lang.getString(R.string.CopyCoordinates), Lang.getString(R.string.OpenInExternalApp)}, null, new int[] {R.drawable.baseline_map_24, R.drawable.baseline_content_copy_24, R.drawable.baseline_open_in_browser_24}, (itemView, id) -> {
-                if (id == R.id.btn_copyText) {
-                  UI.copyText(String.format(Locale.US, "%f,%f", latitude, longitude), R.string.CopiedCoordinates);
-                } else if (id == R.id.btn_open) {
-                  if (tdlib.ui().openMap(TGMessageLocation.this, args)) {
-                    readContent();
+              int type = Settings.instance().getMapProviderType(false);
+              if (type != Settings.MAP_PROVIDER_GOOGLE) {
+                double latitude = point.latitude;
+                double longitude = point.longitude;
+                controller().showOptions(latitudeStr(latitude) + " " + longitudeStr(longitude), new int[] {R.id.btn_open, R.id.btn_copyText, R.id.btn_openIn}, new String[] {Lang.getString(R.string.OpenMap), Lang.getString(R.string.CopyCoordinates), Lang.getString(R.string.OpenInExternalApp)}, null, new int[] {R.drawable.baseline_map_24, R.drawable.baseline_content_copy_24, R.drawable.baseline_open_in_browser_24}, (itemView, id) -> {
+                  if (id == R.id.btn_copyText) {
+                    UI.copyText(String.format(Locale.US, "%f,%f", latitude, longitude), R.string.CopiedCoordinates);
+                  } else if (id == R.id.btn_open) {
+                    if (tdlib.ui().openMap(TGMessageLocation.this, args)) {
+                      readContent();
+                    }
+                  } else if (id == R.id.btn_openIn) {
+                    if (Intents.openMap(latitude, longitude, args.title, args.address)) {
+                      readContent();
+                    }
                   }
-                } else if (id == R.id.btn_openIn) {
-                  if (Intents.openMap(latitude, longitude, args.title, args.address)) {
-                    readContent();
-                  }
-                }
+                  return true;
+                });
                 return true;
-              });
-              return true;
+              }
             }
             if (tdlib.ui().openMap(this, args)) {
               readContent();
