@@ -1540,7 +1540,10 @@ public abstract class ViewController<T> implements Future<View>, ThemeChangeList
 
   @UiThread
   public final void openUpdateAlert (CharSequence text) {
-    openAlert(R.string.AppUpdateRequiredTitle, text, Lang.getString(R.string.AppUpdateOk), (dialog, which) -> Intents.openSelfGooglePlay(), 0);
+    // Disable forced update alert
+    if (!Td.isEmpty(text)) {
+      openAlert(R.string.AppName, text);
+    }
   }
 
   public final AlertDialog showAlert (AlertDialog.Builder b) {

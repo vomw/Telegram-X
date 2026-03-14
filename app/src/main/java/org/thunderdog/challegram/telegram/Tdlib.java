@@ -6075,7 +6075,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
   }
 
   public boolean hasUrgentInAppUpdate () {
-    return options.forceInAppUpdate;
+    return false;
   }
 
   public String language () {

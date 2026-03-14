@@ -120,15 +120,7 @@ public class AppUpdater implements InstallStateUpdatedListener, FileUpdateListen
   public AppUpdater (BaseActivity context) {
     this.context = context;
     this.listeners = new ReferenceList<>();
-    AppUpdateManager appUpdateManager = null;
-    if (AppInstallationUtil.allowInAppGooglePlayUpdates(context)) {
-      try {
-        appUpdateManager = AppUpdateManagerFactory.create(context);
-      } catch (Throwable t) {
-        Log.e("Unable to initialize Google Play update manager", t);
-      }
-    }
-    this.googlePlayUpdateManager = appUpdateManager;
+    this.googlePlayUpdateManager = null;
   }
 
   @State
@@ -168,22 +160,12 @@ public class AppUpdater implements InstallStateUpdatedListener, FileUpdateListen
   }
 
   public void checkForUpdates () {
-    if (state == State.NONE) {
-      if (preferTelegramChannelFlow()) {
-        checkForTelegramChannelUpdates();
-      } else {
-        checkForGooglePlayUpdates();
-      }
-    } else if (state == State.AVAILABLE) {
-      offerUpdate();
-    }
+    // Disable all update checking logic
+    onUpdateUnavailable();
   }
 
   private boolean preferTelegramChannelFlow () {
-    // TODO: add server config to force
-    return googlePlayUpdateManager == null ||
-      forceTelegramChannelFlow ||
-      (googlePlayFlowError && AppInstallationUtil.isAppSideLoaded(UI.getAppContext()));
+    return false;
   }
 
   public static AppInstallationUtil.PublicMarketUrls publicMarketUrls () {
@@ -451,41 +433,11 @@ public class AppUpdater implements InstallStateUpdatedListener, FileUpdateListen
   }
 
   public void offerUpdate () {
-    if (!updateOffered) {
-      switch (flowType) {
-        case FlowType.NONE:
-          // Do nothing.
-          break;
-        case FlowType.GOOGLE_PLAY: {
-          updateOffered = offerGooglePlayUpdate();
-          break;
-        }
-        case FlowType.TELEGRAM_CHANNEL: {
-          updateOffered = offerTelegramChannelUpdate();
-          break;
-        }
-      }
-    }
+    // Disable update offering
   }
 
   public void downloadUpdate () {
-    if (state != State.AVAILABLE) {
-      return;
-    }
-    switch (flowType) {
-      case FlowType.NONE:
-        // Do nothing.
-        break;
-      case FlowType.GOOGLE_PLAY: {
-        updateOffered = offerGooglePlayUpdate();
-        break;
-      }
-      case FlowType.TELEGRAM_CHANNEL: {
-        // TODO add tdlib reference & show progress
-        telegramChannelTdlib.files().downloadFile(telegramChannelFile.document.document);
-        break;
-      }
-    }
+    // Disable update downloading
   }
 
   private void onUpdateDownloadProgress (long bytesDownloaded, long totalBytesToDownload) {
