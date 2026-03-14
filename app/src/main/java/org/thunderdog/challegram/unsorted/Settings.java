@@ -6266,6 +6266,13 @@ public class Settings {
     public final long elapsed;
     public final long result;
 
+    public EmulatorDetectionResult () {
+      this.time = 0;
+      this.installationId = 0;
+      this.elapsed = 0;
+      this.result = 0;
+    }
+
     public EmulatorDetectionResult (long time, long installationId, long elapsed, long result) {
       this.time = time;
       this.installationId = installationId;

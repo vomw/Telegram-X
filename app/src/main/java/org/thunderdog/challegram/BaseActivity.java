@@ -348,7 +348,6 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
         drawer.onCurrentTdlibChanged(tdlib);
       }
       onTdlibChanged();
-      runEmulatorChecks();
     }
   }
 
